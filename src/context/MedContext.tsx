@@ -76,47 +76,66 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Seed initial medicines and data on login
   useEffect(() => {
-    if (user) {
-      // Pre-populate with two medicines so the dashboard doesn't look blank
-      const today = new Date().toISOString().split('T')[0];
-      const initialMeds: ExtractedMedicine[] = [
-        {
-          id: 'med_01',
-          name: 'Lisinopril',
-          dosage: '10mg',
-          timing: ['evening'],
-          instructions: 'Before bed',
-          duration: '30 days',
-          startDate: today,
-          refillsLeft: 3
-        },
-        {
-          id: 'med_02',
-          name: 'Atorvastatin',
-          dosage: '20mg',
-          timing: ['night'],
-          instructions: 'At bedtime',
-          duration: '30 days',
-          startDate: today,
-          refillsLeft: 3
+    const fetchUserData = async () => {
+      if (user) {
+        try {
+          const email = user.email;
+          const [medsRes, adherenceRes] = await Promise.all([
+            fetch(`/api/medicines?userId=${email}`),
+            fetch(`/api/adherence?userId=${email}`)
+          ]);
+          
+          if (medsRes.ok && adherenceRes.ok) {
+            const meds = await medsRes.json();
+            const adherence = await adherenceRes.json();
+            setMedicines(meds);
+            setAdherenceRecords(adherence);
+          }
+        } catch (error) {
+          console.warn('Failed to load user data from Express backend, using defaults:', error);
+          // Standard mock fallback
+          const today = new Date().toISOString().split('T')[0];
+          setMedicines([
+            {
+              id: 'med_01',
+              name: 'Lisinopril',
+              dosage: '10mg',
+              timing: ['evening'],
+              instructions: 'Before bed',
+              duration: '30 days',
+              startDate: today,
+              refillsLeft: 3
+            },
+            {
+              id: 'med_02',
+              name: 'Atorvastatin',
+              dosage: '20mg',
+              timing: ['night'],
+              instructions: 'At bedtime',
+              duration: '30 days',
+              startDate: today,
+              refillsLeft: 3
+            }
+          ]);
         }
-      ];
-      setMedicines(initialMeds);
-      
-      setScanHistory([
-        {
-          id: 'sc_01',
-          title: 'Cardiology Review - Dr. Jenkins',
-          doctorName: 'Dr. Sarah Jenkins, MD',
-          date: '2026-06-28',
-          medCount: 3
-        }
-      ]);
-    } else {
-      setMedicines([]);
-      setAdherenceRecords({});
-      setScanHistory([]);
-    }
+        
+        setScanHistory([
+          {
+            id: 'sc_01',
+            title: 'Cardiology Review - Dr. Jenkins',
+            doctorName: 'Dr. Sarah Jenkins, MD',
+            date: '2026-06-28',
+            medCount: 3
+          }
+        ]);
+      } else {
+        setMedicines([]);
+        setAdherenceRecords({});
+        setScanHistory([]);
+      }
+    };
+    
+    fetchUserData();
   }, [user]);
 
   // Request browser notification permissions
@@ -146,7 +165,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsScanning(true);
     setScanResult(null);
     try {
-      const result = await mockApi.scanPrescription(sampleId);
+      const result = await mockApi.scanPrescription(sampleId || 'pres_01', user?.email || 'anonymous');
       setScanResult(result);
     } catch (e) {
       console.error("Scanning failed", e);
@@ -160,65 +179,132 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setScanResult(null);
   };
 
-  const saveScannedMeds = (meds: Omit<ExtractedMedicine, 'id' | 'startDate'>[]) => {
+  const saveScannedMeds = async (meds: Omit<ExtractedMedicine, 'id' | 'startDate'>[]) => {
     const today = new Date().toISOString().split('T')[0];
-    const newMeds: ExtractedMedicine[] = meds.map((m, idx) => ({
-      ...m,
-      id: `med_${Date.now()}_${idx}`,
-      startDate: today
-    }));
-
-    setMedicines(prev => [...prev, ...newMeds]);
+    const email = user?.email || 'anonymous';
     
-    // Add to history list
-    if (scanResult) {
-      const historyItem: ScanHistoryItem = {
-        id: `sc_${Date.now()}`,
-        title: scanResult.doctorName ? `Prescription - ${scanResult.doctorName.split(',')[0]}` : 'Prescription Scan',
-        doctorName: scanResult.doctorName || 'Unknown Doctor',
-        date: today,
-        medCount: meds.length
-      };
-      setScanHistory(prev => [historyItem, ...prev]);
-    }
-    
-    setScanResult(null);
-  };
-
-  const addMedicine = (med: Omit<ExtractedMedicine, 'id' | 'startDate'>) => {
-    const today = new Date().toISOString().split('T')[0];
-    const newMed: ExtractedMedicine = {
-      ...med,
-      id: `med_${Date.now()}`,
-      startDate: today
-    };
-    setMedicines(prev => [...prev, newMed]);
-  };
-
-  const removeMedicine = (id: string) => {
-    setMedicines(prev => prev.filter(m => m.id !== id));
-  };
-
-  const toggleDose = (dateStr: string, medId: string, timing: string) => {
-    const doseKey = `${medId}_${timing}`;
-    
-    setAdherenceRecords(prev => {
-      const dayRecords = prev[dateStr] || {};
-      const currentDose = dayRecords[doseKey] || { taken: false };
+    try {
+      const savePromises = meds.map(med => 
+        fetch('/api/medicines', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...med, userId: email })
+        }).then(res => {
+          if (!res.ok) throw new Error('Database save failed');
+          return res.json();
+        })
+      );
       
-      const newDoseRecord: DoseRecord = {
-        taken: !currentDose.taken,
-        takenAt: !currentDose.taken ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
-      };
+      const savedMeds = await Promise.all(savePromises);
+      setMedicines(prev => [...prev, ...savedMeds]);
+      
+      if (scanResult) {
+        const historyItem: ScanHistoryItem = {
+          id: `sc_${Date.now()}`,
+          title: scanResult.doctorName ? `Prescription - ${scanResult.doctorName.split(',')[0]}` : 'Prescription Scan',
+          doctorName: scanResult.doctorName || 'Unknown Doctor',
+          date: today,
+          medCount: meds.length
+        };
+        setScanHistory(prev => [historyItem, ...prev]);
+      }
+    } catch (error) {
+      console.warn('Failed to save scanned meds to backend. Falling back to local state:', error);
+      const newMeds: ExtractedMedicine[] = meds.map((m, idx) => ({
+        ...m,
+        id: `med_${Date.now()}_${idx}`,
+        startDate: today
+      }));
+      setMedicines(prev => [...prev, ...newMeds]);
+    } finally {
+      setScanResult(null);
+    }
+  };
 
-      return {
-        ...prev,
-        [dateStr]: {
-          ...dayRecords,
-          [doseKey]: newDoseRecord
-        }
+  const addMedicine = async (med: Omit<ExtractedMedicine, 'id' | 'startDate'>) => {
+    const today = new Date().toISOString().split('T')[0];
+    const email = user?.email || 'anonymous';
+    
+    try {
+      const response = await fetch('/api/medicines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...med, userId: email })
+      });
+      
+      if (response.ok) {
+        const savedMed = await response.json();
+        setMedicines(prev => [...prev, savedMed]);
+      } else {
+        throw new Error('Database insert failed');
+      }
+    } catch (error) {
+      console.warn('Failed to add medicine to backend. Falling back to local state:', error);
+      const newMed: ExtractedMedicine = {
+        ...med,
+        id: `med_${Date.now()}`,
+        startDate: today
       };
-    });
+      setMedicines(prev => [...prev, newMed]);
+    }
+  };
+
+  const removeMedicine = async (id: string) => {
+    try {
+      const response = await fetch(`/api/medicines/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        setMedicines(prev => prev.filter(m => m.id !== id));
+      } else {
+        throw new Error('Database delete failed');
+      }
+    } catch (error) {
+      console.warn('Failed to remove medicine from backend. Falling back to local state:', error);
+      setMedicines(prev => prev.filter(m => m.id !== id));
+    }
+  };
+
+  const toggleDose = async (dateStr: string, medId: string, timing: string) => {
+    const email = user?.email || 'anonymous';
+    
+    try {
+      const response = await fetch('/api/adherence/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr, medId, timing, userId: email })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setAdherenceRecords(prev => ({
+          ...prev,
+          [dateStr]: result.records
+        }));
+      } else {
+        throw new Error('Database check-off failed');
+      }
+    } catch (error) {
+      console.warn('Failed to toggle dose in backend. Falling back to local state:', error);
+      const doseKey = `${medId}_${timing}`;
+      setAdherenceRecords(prev => {
+        const dayRecords = prev[dateStr] || {};
+        const currentDose = dayRecords[doseKey] || { taken: false };
+        
+        const newDoseRecord: DoseRecord = {
+          taken: !currentDose.taken,
+          takenAt: !currentDose.taken ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined
+        };
+
+        return {
+          ...prev,
+          [dateStr]: {
+            ...dayRecords,
+            [doseKey]: newDoseRecord
+          }
+        };
+      });
+    }
   };
 
   const updateEmergencyContact = (name: string, phone: string) => {
