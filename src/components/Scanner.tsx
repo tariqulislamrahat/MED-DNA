@@ -134,8 +134,24 @@ export const Scanner: React.FC = () => {
     }
   };
 
+  const handleCustomFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setSelectedFile(event.target.result as string);
+          setSelectedSampleId('custom');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleStartScan = () => {
-    if (!selectedSampleId) {
+    if (selectedSampleId === 'custom' && selectedFile) {
+      startScanning(selectedFile);
+    } else if (!selectedSampleId) {
       handleSelectSample('pres_01');
       startScanning('pres_01');
     } else {
@@ -189,7 +205,17 @@ export const Scanner: React.FC = () => {
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    handleSelectSample('pres_01');
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setSelectedFile(event.target.result as string);
+          setSelectedSampleId('custom');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = () => {
@@ -246,7 +272,7 @@ export const Scanner: React.FC = () => {
                       type="file" 
                       accept="image/*" 
                       style={{ display: 'none' }}
-                      onChange={() => handleSelectSample('pres_01')} 
+                      onChange={handleCustomFileChange} 
                     />
                   </label>
                 </div>
