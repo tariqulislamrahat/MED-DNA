@@ -12,14 +12,14 @@ import { Reminders } from './components/Reminders';
 import { 
   LayoutDashboard, 
   ScanLine, 
-  CalendarDays, 
-  Pill, 
+  BarChart3, 
+  User,
   X,
-  ShieldAlert
+  Plus
 } from 'lucide-react';
 
 function App() {
-  const { user, sosTriggered, triggerSOS, addMedicine } = useMed();
+  const { user, sosTriggered, addMedicine } = useMed();
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -89,7 +89,6 @@ function App() {
       refillsLeft: newMedRefills
     });
 
-    // Reset fields
     setNewMedName('');
     setNewMedDosage('10mg');
     setNewMedTimings(['morning']);
@@ -102,13 +101,13 @@ function App() {
   const mobileTabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'scanner', label: 'Scan', icon: ScanLine },
-    { id: 'tracker', label: 'Tracker', icon: CalendarDays },
-    { id: 'meds', label: 'Meds', icon: Pill }
+    { id: 'analytics', label: 'Stats', icon: BarChart3 },
+    { id: 'reminders', label: 'Profile', icon: User }
   ];
 
   return (
     <div className={`app-container ${sosTriggered ? 'sos-siren-active' : ''}`}>
-      {/* Navigation Sidebar */}
+      {/* Navigation Sidebar (Desktop) */}
       <Sidebar 
         currentTab={currentTab} 
         setCurrentTab={setCurrentTab} 
@@ -123,22 +122,32 @@ function App() {
         {renderActiveTab()}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Hidden on desktop) */}
+      {/* Mobile Bottom Navigation Bar (Reference-styled rounded pill nav) */}
       <nav className="mobile-bottom-nav">
-        {mobileTabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = currentTab === tab.id;
-          return (
-            <button 
-              key={tab.id}
-              className={`mobile-tab-btn ${isActive ? 'active' : ''}`}
-              onClick={() => setCurrentTab(tab.id)}
-            >
-              <Icon size={20} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+        <div className="mobile-nav-inner">
+          {mobileTabs.map(tab => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.id;
+            return (
+              <button 
+                key={tab.id}
+                className={`mobile-tab-btn ${isActive ? 'active' : ''}`}
+                onClick={() => setCurrentTab(tab.id)}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                {isActive && <span>{tab.label}</span>}
+              </button>
+            );
+          })}
+
+          {/* FAB Add button like the reference */}
+          <button 
+            className="mobile-fab-btn"
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            <Plus size={22} strokeWidth={2.5} />
+          </button>
+        </div>
       </nav>
 
       {/* Manual Add Medicine Modal Overlay */}
@@ -146,7 +155,7 @@ function App() {
         <div className="modal-overlay" onClick={() => setIsAddModalOpen(false)}>
           <div className="modal-content glass-card manual-add-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Add Medicine Manually</h3>
+              <h3>Add Medicine</h3>
               <button className="close-modal-btn" onClick={() => setIsAddModalOpen(false)}>
                 <X size={20} />
               </button>
@@ -240,78 +249,78 @@ function App() {
         </div>
       )}
 
-      {/* Global Mobile SOS Hover Button (Floating) */}
-      <button className="mobile-sos-floating-btn" onClick={triggerSOS} title="Emergency SOS">
-        <ShieldAlert size={24} />
-      </button>
-
       <style>{`
-        /* Mobile navigation styling */
+        /* === Mobile Bottom Navigation === */
         .mobile-bottom-nav {
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
-          height: 64px;
-          background: rgba(11, 15, 25, 0.95);
-          border-top: 1px solid var(--border-color);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          z-index: 99;
+          padding: 0 0.75rem 0.5rem;
+          pointer-events: none;
+        }
+
+        .mobile-nav-inner {
+          background: #1a1a2e;
+          border-radius: var(--radius-xl);
+          height: 58px;
           display: flex;
           align-items: center;
           justify-content: space-around;
-          z-index: 99;
-          padding: 0 1rem;
+          padding: 0 0.5rem;
+          pointer-events: auto;
+          box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.15);
         }
 
         .mobile-tab-btn {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: 0.25rem;
+          gap: 0.35rem;
           background: transparent;
           border: none;
-          color: var(--text-secondary);
+          color: rgba(255, 255, 255, 0.45);
           cursor: pointer;
           font-family: var(--font-sans);
-          font-size: 0.75rem;
-          font-weight: 500;
-          transition: color var(--transition-fast);
+          font-size: 0.78rem;
+          font-weight: 600;
+          padding: 0.5rem 0.75rem;
+          border-radius: var(--radius-full);
+          transition: all var(--transition-fast);
         }
 
-        .mobile-tab-btn:hover, .mobile-tab-btn.active {
-          color: var(--color-primary);
+        .mobile-tab-btn.active {
+          background: rgba(255, 255, 255, 0.12);
+          color: white;
         }
 
-        .mobile-sos-floating-btn {
-          position: fixed;
-          bottom: 80px;
-          right: 16px;
-          width: 52px;
-          height: 52px;
+        .mobile-fab-btn {
+          width: 46px;
+          height: 46px;
           border-radius: 50%;
-          background: var(--gradient-danger);
+          background: var(--color-primary);
           color: white;
           border: none;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 15px rgba(244, 63, 94, 0.4);
           cursor: pointer;
-          z-index: 98;
-          display: none; /* Desktop hidden */
+          box-shadow: 0 4px 12px rgba(229, 57, 53, 0.35);
+          transition: all var(--transition-fast);
+          flex-shrink: 0;
         }
 
-        .mobile-sos-floating-btn:hover {
+        .mobile-fab-btn:hover {
           transform: scale(1.05);
+        }
+
+        .mobile-fab-btn:active {
+          transform: scale(0.95);
         }
 
         @media (max-width: 768px) {
           .mobile-bottom-nav {
-            display: flex;
-          }
-          .mobile-sos-floating-btn {
-            display: flex;
+            display: block;
           }
         }
 
@@ -319,28 +328,27 @@ function App() {
           .mobile-bottom-nav {
             display: none !important;
           }
-          .mobile-sos-floating-btn {
-            display: none !important;
-          }
         }
 
-        /* Modal additions styling */
+        /* === Modal styles === */
         .manual-add-modal {
-          max-width: 500px;
+          max-width: 480px;
           width: 100%;
-          background: #0d1321;
+          background: white;
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
+          gap: 1.25rem;
           text-align: left;
+          border-radius: var(--radius-lg);
+          padding: 1.5rem;
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border-bottom: 1px solid var(--border-color);
           padding-bottom: 0.75rem;
+          border-bottom: 1px solid var(--border-color);
         }
 
         .close-modal-btn {
@@ -348,28 +356,39 @@ function App() {
           border: none;
           color: var(--text-muted);
           cursor: pointer;
+          padding: 0.25rem;
+          border-radius: 50%;
+          transition: all var(--transition-fast);
         }
 
         .close-modal-btn:hover {
           color: var(--text-primary);
+          background: var(--bg-input);
         }
 
         .manual-add-form {
           display: flex;
           flex-direction: column;
-          gap: 1.25rem;
+          gap: 1rem;
         }
 
         .manual-form-row {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 1rem;
+          gap: 0.75rem;
+        }
+
+        @media (max-width: 480px) {
+          .manual-form-row {
+            grid-template-columns: 1fr;
+          }
         }
 
         .submit-med-btn {
-          margin-top: 0.5rem;
-          padding: 0.9rem;
+          margin-top: 0.25rem;
+          padding: 0.85rem;
           font-weight: 700;
+          width: 100%;
         }
       `}</style>
     </div>
@@ -377,4 +396,3 @@ function App() {
 }
 
 export default App;
-

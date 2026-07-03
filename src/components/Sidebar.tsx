@@ -44,26 +44,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
-        {/* Logo Section */}
+        {/* Logo */}
         <div className="sidebar-logo">
-          <div className="logo-icon-wrapper">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4.5 10.5C4.5 7.46243 6.96243 5 10 5C13.0376 5 15.5 7.46243 15.5 10.5C15.5 12.0188 14.8826 13.3938 13.8826 14.3938M4.5 10.5C4.5 13.5376 6.96243 16 10 16C11.5188 16 12.8938 15.3826 13.8826 14.3938M4.5 10.5H15.5M13.8826 14.3938L19.5 20M13.8826 14.3938C13.8826 14.3938 15.5 14.5 17 13C18.5 11.5 18.5 9.5 18.5 9.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="10" cy="5" r="1.5" fill="currentColor"/>
-              <circle cx="4.5" cy="10.5" r="1.5" fill="currentColor"/>
-              <circle cx="10" cy="16" r="1.5" fill="currentColor"/>
-              <circle cx="15.5" cy="10.5" r="1.5" fill="currentColor"/>
-            </svg>
+          <div className="logo-mark">
+            <span className="logo-letter">M</span>
           </div>
-          {!collapsed && <span className="logo-text">Med<span className="text-gradient">DNA</span></span>}
+          {!collapsed && <span className="logo-text">Med<span className="logo-accent">DNA</span></span>}
         </div>
 
-        {/* Sidebar Collapse Toggle Button */}
+        {/* Collapse Toggle */}
         <button className="collapse-toggle" onClick={() => setCollapsed(!collapsed)} aria-label="Toggle Sidebar">
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
 
-        {/* Nav Links */}
+        {/* Nav */}
         <nav className="sidebar-nav">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -74,25 +68,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setCurrentTab(item.id)}
               >
-                <Icon size={20} className="nav-icon" />
+                <Icon size={19} className="nav-icon" />
                 {!collapsed && <span className="nav-label">{item.label}</span>}
                 {!collapsed && item.badge && (
                   <span className="nav-badge">{item.badge}</span>
-                )}
-                {collapsed && item.badge && (
-                  <span className="nav-badge-dot" />
                 )}
               </button>
             );
           })}
         </nav>
 
-        {/* Bottom Section: Profile & Emergency */}
+        {/* Footer */}
         <div className="sidebar-footer">
-          {/* Actionable SOS Button in Sidebar (if not collapsed) */}
           {!collapsed && (
             <button className="sidebar-sos-btn" onClick={triggerSOS}>
-              <ShieldAlert size={18} />
+              <ShieldAlert size={16} />
               <span>EMERGENCY SOS</span>
             </button>
           )}
@@ -106,13 +96,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
             <button className="logout-btn" onClick={logout} title="Sign Out">
-              <LogOut size={18} />
+              <LogOut size={16} />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Styles local to sidebar */}
       <style>{`
         .sidebar {
           position: fixed;
@@ -120,13 +109,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           left: 0;
           bottom: 0;
           width: var(--sidebar-width);
-          background: rgba(11, 15, 25, 0.85);
+          background: white;
           border-right: 1px solid var(--border-color);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
           display: flex;
           flex-direction: column;
-          padding: 1.5rem 1rem;
+          padding: 1.25rem 0.75rem;
           z-index: 100;
           transition: width var(--transition-normal);
         }
@@ -138,71 +125,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-logo {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 0.5rem 0.75rem 2rem 0.75rem;
-          color: var(--text-primary);
+          gap: 0.65rem;
+          padding: 0.25rem 0.75rem 1.5rem 0.75rem;
         }
 
-        .logo-icon-wrapper {
-          background: var(--gradient-primary);
-          color: white;
-          width: 38px;
-          height: 38px;
+        .logo-mark {
+          width: 34px;
+          height: 34px;
           border-radius: var(--radius-sm);
+          background: var(--color-primary);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 4px 12px var(--color-primary-glow);
           flex-shrink: 0;
         }
 
-        .logo-text {
-          font-family: var(--font-sans);
-          font-weight: 800;
-          font-size: 1.4rem;
-          letter-spacing: -0.03em;
+        .logo-letter {
+          color: white;
+          font-family: var(--font-display);
+          font-weight: 900;
+          font-size: 1.1rem;
         }
 
-        .text-gradient {
-          background: var(--gradient-accent);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+        .logo-text {
+          font-family: var(--font-display);
+          font-weight: 800;
+          font-size: 1.3rem;
+          letter-spacing: -0.03em;
+          color: var(--text-primary);
+        }
+
+        .logo-accent {
+          color: var(--color-primary);
         }
 
         .collapse-toggle {
           position: absolute;
-          top: 24px;
-          right: -12px;
-          width: 24px;
-          height: 24px;
+          top: 22px;
+          right: -11px;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
-          background: #111827;
+          background: white;
           border: 1px solid var(--border-color);
-          color: var(--text-secondary);
+          color: var(--text-muted);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           z-index: 110;
-          transition: color var(--transition-fast);
+          transition: all var(--transition-fast);
+          box-shadow: var(--shadow-sm);
         }
 
         .collapse-toggle:hover {
           color: var(--color-primary);
+          border-color: var(--color-primary);
         }
 
         .sidebar-nav {
           display: flex;
           flex-direction: column;
-          gap: 0.4rem;
+          gap: 0.2rem;
           flex: 1;
         }
 
         .nav-item {
           display: flex;
           align-items: center;
-          gap: 1rem;
-          padding: 0.85rem 1rem;
+          gap: 0.75rem;
+          padding: 0.7rem 0.85rem;
           background: transparent;
           border: none;
           color: var(--text-secondary);
@@ -212,20 +204,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           text-align: left;
           font-family: var(--font-sans);
           font-weight: 500;
-          font-size: 0.95rem;
+          font-size: 0.88rem;
           transition: all var(--transition-fast);
           position: relative;
         }
 
         .nav-item:hover {
-          background: rgba(255, 255, 255, 0.03);
+          background: var(--bg-input);
           color: var(--text-primary);
         }
 
         .nav-item.active {
           background: var(--color-primary-glow);
           color: var(--color-primary);
-          box-shadow: inset 3px 0 0 var(--color-primary);
+          font-weight: 600;
         }
 
         .nav-icon {
@@ -234,30 +226,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         .nav-badge {
           margin-left: auto;
-          background: var(--color-secondary);
+          background: var(--color-primary);
           color: white;
-          font-size: 0.75rem;
-          padding: 0.15rem 0.5rem;
+          font-size: 0.68rem;
+          padding: 0.1rem 0.4rem;
           border-radius: var(--radius-full);
-          font-weight: 600;
-        }
-
-        .nav-badge-dot {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          width: 8px;
-          height: 8px;
-          background-color: var(--color-secondary);
-          border-radius: 50%;
-          border: 2px solid #090d16;
+          font-weight: 700;
+          min-width: 20px;
+          text-align: center;
         }
 
         .sidebar-footer {
           display: flex;
           flex-direction: column;
-          gap: 1rem;
-          padding-top: 1.5rem;
+          gap: 0.75rem;
+          padding-top: 1rem;
           border-top: 1px solid var(--border-color);
         }
 
@@ -265,42 +248,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 0.5rem;
-          background: var(--gradient-danger);
+          gap: 0.4rem;
+          background: var(--color-danger);
           color: white;
           border: none;
-          padding: 0.75rem;
+          padding: 0.6rem;
           border-radius: var(--radius-sm);
           font-family: var(--font-sans);
           font-weight: 700;
-          font-size: 0.85rem;
+          font-size: 0.78rem;
           cursor: pointer;
-          letter-spacing: 0.05em;
-          box-shadow: 0 4px 12px rgba(244, 63, 94, 0.25);
-          transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+          letter-spacing: 0.04em;
+          box-shadow: 0 2px 8px rgba(211, 47, 47, 0.2);
+          transition: all var(--transition-fast);
         }
 
         .sidebar-sos-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(244, 63, 94, 0.4);
+          background: #b71c1c;
+          transform: translateY(-1px);
         }
 
         .profile-badge {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 0.5rem;
-          background: rgba(255, 255, 255, 0.02);
+          gap: 0.6rem;
+          padding: 0.4rem;
+          background: var(--bg-input);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
         }
 
         .profile-avatar {
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
           border-radius: 50%;
           object-fit: cover;
-          border: 2px solid var(--color-primary);
+          flex-shrink: 0;
         }
 
         .profile-info {
@@ -312,7 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         .profile-name {
           font-weight: 600;
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           color: var(--text-primary);
           white-space: nowrap;
           overflow: hidden;
@@ -320,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         .profile-email {
-          font-size: 0.7rem;
+          font-size: 0.65rem;
           color: var(--text-muted);
           white-space: nowrap;
           overflow: hidden;
@@ -337,6 +320,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           justify-content: center;
           transition: color var(--transition-fast);
           padding: 0.25rem;
+          flex-shrink: 0;
         }
 
         .logout-btn:hover {
@@ -345,7 +329,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         @media (max-width: 768px) {
           .sidebar {
-            display: none; /* hidden on mobile, replaced by bottom bar */
+            display: none;
           }
         }
       `}</style>

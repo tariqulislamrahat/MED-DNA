@@ -6,11 +6,13 @@ import {
   UploadCloud, 
   Plus, 
   AlertTriangle, 
-  Activity, 
   Volume2, 
-  Calendar,
-  Clock,
-  Sparkles
+  Bell,
+  ArrowRight,
+  Sparkles,
+  Pill,
+  MapPin,
+  CalendarDays
 } from 'lucide-react';
 import { MEDICINE_DATABASE } from '../services/mockData';
 
@@ -25,9 +27,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
     medicines, 
     adherenceRecords, 
     toggleDose, 
-    speakText, 
-    triggerSOS, 
-    sendPushTest 
+    speakText
   } = useMed();
   
   const todayStr = new Date().toISOString().split('T')[0];
@@ -38,7 +38,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
   });
 
   // Calculate doses for today
-  // A medicine has a schedule (timings e.g. 'morning', 'afternoon', 'evening', 'night')
   const todayDoses: { medId: string; medName: string; dosage: string; timing: string; instructions: string }[] = [];
   
   medicines.forEach(med => {
@@ -67,6 +66,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
 
   // Group doses by timing slot
   const timeSlots = ['morning', 'afternoon', 'evening', 'night'];
+  const timeSlotLabels: Record<string, string> = {
+    morning: '🌅 Morning',
+    afternoon: '☀️ Afternoon',
+    evening: '🌆 Evening',
+    night: '🌙 Night'
+  };
   
   // Interaction check
   const activeMedNames = medicines.map(m => m.name);
@@ -88,360 +93,443 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
     }
   }
 
-  const triggerTestAlert = () => {
-    const nextDose = todayDoses.find(dose => {
-      const key = `${dose.medId}_${dose.timing}`;
-      return !dayRecords[key]?.taken;
-    });
-
-    if (nextDose) {
-      sendPushTest(
-        `Medication Reminder: ${nextDose.medName}`,
-        `It's time to take your ${nextDose.medName} ${nextDose.dosage} (${nextDose.instructions || 'as directed'}).`
-      );
-    } else {
-      sendPushTest(
-        "MedDNA Adherence Alert",
-        "Excellent job! All your medicines for today are checked off."
-      );
-    }
-  };
+  // SVG ring calculations
+  const ringRadius = 54;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - progressPercentage / 100);
 
   return (
     <div className="dashboard-view animate-fade-in">
-      {/* Header Greeting */}
-      <header className="dashboard-header">
-        <div>
-          <span className="date-badge"><Calendar size={14} /> {formattedDate}</span>
-          <h1 className="welcome-text">Welcome back, {user?.name.split(' ')[0]}!</h1>
-          <p className="subtitle-text">Here is your medical plan and dosage schedule for today.</p>
+      {/* Welcome Header */}
+      <header className="dash-header">
+        <div className="dash-header-left">
+          <span className="dash-greeting-label">WELCOME BACK</span>
+          <h1 className="dash-user-name">{user?.name || 'User'}</h1>
         </div>
-        
-        {/* Quick SOS Trigger Button */}
-        <button className="sos-pill-btn" onClick={triggerSOS}>
-          <Activity size={16} className="pulse-icon" />
-          <span>TRIGGER EMERGENCY SOS</span>
-        </button>
+        <div className="dash-header-right">
+          <img src={user?.avatar} alt={user?.name} className="dash-avatar" />
+          <button className="dash-bell-btn" onClick={() => setCurrentTab('reminders')}>
+            <Bell size={18} />
+          </button>
+        </div>
       </header>
 
-      {/* Grid Layout */}
-      <div className="dashboard-grid">
-        
-        {/* Progress & Stats Card */}
-        <div className="glass-card stats-card">
-          <div className="stats-card-header">
-            <h3>Adherence Progress</h3>
-            <span className="progress-fraction">{takenDosesCount}/{totalDosesCount} taken</span>
-          </div>
-
-          <div className="progress-visual-wrapper">
-            <div className="progress-ring-container">
-              <svg className="progress-ring" width="160" height="160">
-                {/* Background Ring */}
-                <circle 
-                  className="progress-ring-circle-bg" 
-                  stroke="rgba(255,255,255,0.05)" 
-                  strokeWidth="10" 
-                  fill="transparent" 
-                  r="70" 
-                  cx="80" 
-                  cy="80" 
-                />
-                {/* Foreground Progress Ring */}
-                <circle 
-                  className="progress-ring-circle-fg" 
-                  stroke="url(#tealIndigoGradient)" 
-                  strokeWidth="12" 
-                  strokeDasharray={`${2 * Math.PI * 70}`}
-                  strokeDashoffset={`${2 * Math.PI * 70 * (1 - progressPercentage / 100)}`}
-                  strokeLinecap="round"
-                  fill="transparent" 
-                  r="70" 
-                  cx="80" 
-                  cy="80" 
-                />
-                <defs>
-                  <linearGradient id="tealIndigoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#0d9488" />
-                    <stop offset="100%" stopColor="#6366f1" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="progress-value-label">
-                <span className="percentage">{progressPercentage}%</span>
-                <span className="label">Completed</span>
-              </div>
-            </div>
-          </div>
-
-          {progressPercentage === 100 && totalDosesCount > 0 && (
-            <div className="streak-badge-banner">
-              <Sparkles size={16} />
-              <span>Perfect day! 100% adherence achieved.</span>
-            </div>
-          )}
-
-          <div className="stats-quick-stats">
-            <div className="stat-col">
-              <span className="stat-val">{medicines.length}</span>
-              <span className="stat-lbl">Active Meds</span>
-            </div>
-            <div className="stat-col line-split">
-              <span className="stat-val">{medicines.reduce((acc, curr) => acc + curr.refillsLeft, 0)}</span>
-              <span className="stat-lbl">Total Refills</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Panel */}
-        <div className="glass-card actions-card">
-          <h3>Quick Health Actions</h3>
-          <p className="card-desc">Easily scan new prescriptions, update schedules, or run tests.</p>
-          
-          <div className="actions-button-grid">
-            <button className="action-tile-btn primary-gradient" onClick={() => setCurrentTab('scanner')}>
-              <div className="action-tile-icon"><UploadCloud size={24} /></div>
-              <div className="action-tile-text">
-                <span className="title">Scan Prescription</span>
-                <span className="desc">Upload image/PDF or use camera</span>
-              </div>
-            </button>
-
-            <button className="action-tile-btn outline-border" onClick={onOpenAddModal}>
-              <div className="action-tile-icon teal-tint"><Plus size={22} /></div>
-              <div className="action-tile-text">
-                <span className="title">Add Medicine</span>
-                <span className="desc">Manually configure schedule</span>
-              </div>
-            </button>
-
-            <button className="action-tile-btn outline-border" onClick={triggerTestAlert}>
-              <div className="action-tile-icon indigo-tint"><Clock size={20} /></div>
-              <div className="action-tile-text">
-                <span className="title">Trigger Reminder Alert</span>
-                <span className="desc">Simulate scheduled alarm</span>
-              </div>
-            </button>
-          </div>
+      {/* Adherence Summary Bar */}
+      <div className="adherence-summary-strip">
+        <div className="adherence-stat-left">
+          <span className="adherence-label">TODAY'S PROGRESS</span>
+          <span className="adherence-big-number">{takenDosesCount}/{totalDosesCount}</span>
+          <span className="adherence-sub-text">{formattedDate}</span>
         </div>
       </div>
 
-      {/* Drug Interaction Banner Alerts */}
-      {interactionWarnings.length > 0 && (
-        <div className="glass-card interaction-alert-panel">
-          <div className="alert-header">
-            <AlertTriangle size={24} className="warning-pulse-icon" />
-            <div>
-              <h4>Critical Interaction Warnings Detected ({interactionWarnings.length})</h4>
-              <p>The system identified potential severe side effects from combining these medicines.</p>
+      {/* Dark Chart Card — Adherence Progress Ring */}
+      <div className="dark-card progress-chart-card">
+        <div className="chart-card-header">
+          <div>
+            <h3 style={{ color: 'white', fontSize: '1rem' }}>Adherence Progress</h3>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>Today's dose completion</p>
+          </div>
+          <span className="chart-time-badge">Today</span>
+        </div>
+
+        <div className="progress-ring-row">
+          <div className="progress-ring-wrapper">
+            <svg width="130" height="130" viewBox="0 0 130 130">
+              <circle 
+                cx="65" cy="65" r={ringRadius}
+                fill="none" 
+                stroke="rgba(255,255,255,0.08)" 
+                strokeWidth="10" 
+              />
+              <circle 
+                cx="65" cy="65" r={ringRadius}
+                fill="none"
+                stroke="#e53935"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray={ringCircumference}
+                strokeDashoffset={ringOffset}
+                style={{ transform: 'rotate(-90deg)', transformOrigin: '65px 65px', transition: 'stroke-dashoffset 0.6s ease' }}
+              />
+            </svg>
+            <div className="ring-center-label">
+              <span className="ring-pct">{progressPercentage}%</span>
+              <span className="ring-sub">Done</span>
             </div>
           </div>
-          <div className="alert-list">
-            {interactionWarnings.map((warning, idx) => (
-              <div key={idx} className="alert-item">
-                <span className="alert-names">{warning.medA} + {warning.medB}</span>
-                <p className="alert-note">{warning.note}</p>
-              </div>
-            ))}
+
+          <div className="ring-stats-col">
+            <div className="ring-stat-item">
+              <span className="ring-stat-val">{medicines.length}</span>
+              <span className="ring-stat-lbl">Active Meds</span>
+            </div>
+            <div className="ring-stat-item">
+              <span className="ring-stat-val">{takenDosesCount}</span>
+              <span className="ring-stat-lbl">Doses Taken</span>
+            </div>
+            <div className="ring-stat-item">
+              <span className="ring-stat-val">{totalDosesCount - takenDosesCount}</span>
+              <span className="ring-stat-lbl">Remaining</span>
+            </div>
           </div>
+        </div>
+
+        {progressPercentage === 100 && totalDosesCount > 0 && (
+          <div className="perfect-day-banner">
+            <Sparkles size={14} />
+            <span>Perfect day! All doses completed.</span>
+          </div>
+        )}
+      </div>
+
+      {/* Update Banner */}
+      {medicines.length > 0 && (
+        <div className="update-banner" onClick={() => setCurrentTab('tracker')}>
+          <div className="update-left">
+            <span className="update-badge">● TRACKER</span>
+            <span className="update-text">View your weekly dose history & streaks</span>
+          </div>
+          <ArrowRight size={18} />
         </div>
       )}
 
-      {/* Today's Schedule Timeline Checklist */}
-      <div className="glass-card timeline-card">
-        <div className="timeline-header">
-          <h3>Today's Medication Checklist</h3>
-          <p className="card-desc">Check off each medicine as you take it. Timing slots correspond to your schedule.</p>
+      {/* === Desktop 2-Column Grid === */}
+      <div className="dash-two-col">
+        {/* Left Column: Quick Actions + Warnings */}
+        <div className="dash-col-left">
+          {/* Quick Action Hub */}
+          <div className="quick-hub-section">
+            <span className="section-title"><Sparkles size={14} /> QUICK ACTIONS</span>
+            <div className="quick-hub-grid">
+              <button className="quick-hub-item" onClick={() => setCurrentTab('scanner')}>
+                <div className="hub-icon-circle"><UploadCloud size={20} /></div>
+                <span>Scan Rx</span>
+              </button>
+              <button className="quick-hub-item" onClick={onOpenAddModal}>
+                <div className="hub-icon-circle"><Plus size={20} /></div>
+                <span>Add Med</span>
+              </button>
+              <button className="quick-hub-item" onClick={() => setCurrentTab('meds')}>
+                <div className="hub-icon-circle"><Pill size={20} /></div>
+                <span>Medicines</span>
+              </button>
+              <button className="quick-hub-item" onClick={() => setCurrentTab('pharmacy')}>
+                <div className="hub-icon-circle"><MapPin size={20} /></div>
+                <span>Pharmacy</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Drug Interaction Warning */}
+          {interactionWarnings.length > 0 && (
+            <div className="interaction-warning-card">
+              <div className="warning-card-header">
+                <AlertTriangle size={18} className="warning-icon-pulse" />
+                <span>Drug Interaction Alert ({interactionWarnings.length})</span>
+              </div>
+              <p className="warning-body-text">
+                {interactionWarnings[0].medA} + {interactionWarnings[0].medB}: {interactionWarnings[0].note}
+              </p>
+            </div>
+          )}
+
+          {/* Stats summary cards */}
+          <div className="dash-stat-cards-row">
+            <div className="dash-stat-card">
+              <span className="dash-stat-icon">💊</span>
+              <div>
+                <span className="dash-stat-number">{medicines.length}</span>
+                <span className="dash-stat-label">Active Medicines</span>
+              </div>
+            </div>
+            <div className="dash-stat-card">
+              <span className="dash-stat-icon">🔄</span>
+              <div>
+                <span className="dash-stat-number">{medicines.reduce((a, m) => a + m.refillsLeft, 0)}</span>
+                <span className="dash-stat-label">Refills Left</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {totalDosesCount === 0 ? (
-          <div className="empty-schedule-state">
-            <p>No medicines are scheduled for today.</p>
-            <button className="btn btn-primary" onClick={() => setCurrentTab('scanner')}>
-              <Plus size={16} /> Scan a Prescription to Begin
-            </button>
+        {/* Right Column: Today's Checklist */}
+        <div className="dash-col-right">
+          <div className="checklist-section">
+            <div className="flex-title-row" style={{ marginBottom: '0.75rem' }}>
+              <h2>Today's Medications</h2>
+              <button className="btn btn-secondary btn-xs" onClick={() => setCurrentTab('tracker')}>
+                <CalendarDays size={14} /> History
+              </button>
+            </div>
+
+            {totalDosesCount === 0 ? (
+              <div className="empty-schedule">
+                <p>No medicines scheduled. Scan a prescription to get started.</p>
+                <button className="btn btn-primary" onClick={() => setCurrentTab('scanner')}>
+                  <UploadCloud size={16} /> Scan Prescription
+                </button>
+              </div>
+            ) : (
+              <div className="checklist-slots">
+                {timeSlots.map(slot => {
+                  const slotDoses = todayDoses.filter(dose => dose.timing.toLowerCase() === slot);
+                  if (slotDoses.length === 0) return null;
+
+                  return (
+                    <div key={slot} className="checklist-slot">
+                      <span className="slot-time-label">{timeSlotLabels[slot]}</span>
+                      <div className="slot-items">
+                        {slotDoses.map((dose, index) => {
+                          const doseKey = `${dose.medId}_${dose.timing}`;
+                          const isTaken = dayRecords[doseKey]?.taken;
+                          const takenTime = dayRecords[doseKey]?.takenAt;
+
+                          return (
+                            <div 
+                              key={index} 
+                              className={`dose-item ${isTaken ? 'taken' : ''}`}
+                            >
+                              <button 
+                                className="dose-check-btn"
+                                onClick={() => toggleDose(todayStr, dose.medId, dose.timing)}
+                              >
+                                {isTaken ? (
+                                  <CheckCircle2 size={22} className="icon-taken" />
+                                ) : (
+                                  <Circle size={22} className="icon-pending" />
+                                )}
+                              </button>
+
+                              <div className="dose-info">
+                                <span className="dose-name">{dose.medName} <span className="dose-strength">{dose.dosage}</span></span>
+                                <span className="dose-instructions">{dose.instructions}</span>
+                              </div>
+
+                              {isTaken && (
+                                <span className="taken-badge">✓ {takenTime}</span>
+                              )}
+
+                              <button 
+                                className="speak-btn" 
+                                onClick={() => speakText(`Take ${dose.medName} ${dose.dosage}. ${dose.instructions}`)}
+                              >
+                                <Volume2 size={15} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="timeline-slots">
-            {timeSlots.map(slot => {
-              const slotDoses = todayDoses.filter(dose => dose.timing.toLowerCase() === slot);
-              if (slotDoses.length === 0) return null;
-
-              return (
-                <div key={slot} className="timeline-slot-row">
-                  <div className="slot-label-col">
-                    <span className="slot-dot" />
-                    <span className="slot-title">{slot.toUpperCase()}</span>
-                  </div>
-                  
-                  <div className="slot-items-col">
-                    {slotDoses.map((dose, index) => {
-                      const doseKey = `${dose.medId}_${dose.timing}`;
-                      const isTaken = dayRecords[doseKey]?.taken;
-                      const takenTime = dayRecords[doseKey]?.takenAt;
-
-                      return (
-                        <div 
-                          key={index} 
-                          className={`dose-checklist-item ${isTaken ? 'checked-taken' : ''}`}
-                        >
-                          <button 
-                            className="dose-check-btn"
-                            onClick={() => toggleDose(todayStr, dose.medId, dose.timing)}
-                            title={isTaken ? "Mark as missed" : "Mark as taken"}
-                          >
-                            {isTaken ? (
-                              <CheckCircle2 size={22} className="check-success-icon" />
-                            ) : (
-                              <Circle size={22} className="check-pending-icon" />
-                            )}
-                          </button>
-
-                          <div className="dose-details">
-                            <span className="med-name">{dose.medName} <span className="med-dosage">{dose.dosage}</span></span>
-                            <span className="med-instructions">{dose.instructions}</span>
-                          </div>
-
-                          {isTaken && (
-                            <span className="taken-time-badge">Taken {takenTime}</span>
-                          )}
-
-                          <button 
-                            className="voice-btn" 
-                            onClick={() => speakText(`Take ${dose.medName} ${dose.dosage}. Directions: ${dose.instructions}`)}
-                            title="Listen to dosage instructions"
-                          >
-                            <Volume2 size={16} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        </div>
       </div>
 
       <style>{`
         .dashboard-view {
           display: flex;
           flex-direction: column;
-          gap: 2rem;
+          gap: 1.25rem;
         }
 
-        .dashboard-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 1.5rem;
-        }
-
-        .date-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          color: var(--color-primary);
-          background: var(--color-primary-glow);
-          border: 1px solid rgba(13, 148, 136, 0.2);
-          padding: 0.3rem 0.75rem;
-          border-radius: var(--radius-full);
-          font-size: 0.8rem;
-          font-weight: 600;
-          margin-bottom: 0.5rem;
-        }
-
-        .welcome-text {
-          font-size: 2rem;
-          font-weight: 800;
-          letter-spacing: -0.03em;
-        }
-
-        .subtitle-text {
-          color: var(--text-secondary);
-          font-size: 0.95rem;
-        }
-
-        .sos-pill-btn {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: var(--color-danger-glow);
-          border: 1px solid var(--color-danger);
-          color: var(--color-danger);
-          padding: 0.75rem 1.25rem;
-          border-radius: var(--radius-full);
-          font-family: var(--font-sans);
-          font-weight: 700;
-          font-size: 0.85rem;
-          cursor: pointer;
-          transition: all var(--transition-normal);
-          box-shadow: 0 4px 12px rgba(244, 63, 94, 0.15);
-        }
-
-        .sos-pill-btn:hover {
-          background: var(--gradient-danger);
-          color: white;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(244, 63, 94, 0.35);
-        }
-
-        .pulse-icon {
-          animation: pulseGlow 1.5s infinite;
-        }
-
-        .dashboard-grid {
+        /* Two-column desktop grid */
+        .dash-two-col {
           display: grid;
-          grid-template-columns: 1.2fr 1.8fr;
-          gap: 2rem;
+          grid-template-columns: 1fr 1.4fr;
+          gap: 1.5rem;
+          align-items: start;
         }
 
         @media (max-width: 900px) {
-          .dashboard-grid {
+          .dash-two-col {
             grid-template-columns: 1fr;
           }
         }
 
-        .stats-card {
+        .dash-col-left {
           display: flex;
           flex-direction: column;
-          align-items: center;
-          text-align: center;
-          gap: 1.5rem;
+          gap: 1.25rem;
         }
 
-        .stats-card-header {
-          width: 100%;
+        .dash-col-right {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
+          flex-direction: column;
+          gap: 1.25rem;
         }
 
-        .progress-fraction {
-          font-size: 0.85rem;
+        /* Stat cards row */
+        .dash-stat-cards-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.75rem;
+        }
+
+        .dash-stat-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          padding: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .dash-stat-icon {
+          font-size: 1.5rem;
+        }
+
+        .dash-stat-card > div {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .dash-stat-number {
+          font-size: 1.3rem;
+          font-weight: 800;
+          line-height: 1.1;
+        }
+
+        .dash-stat-label {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        /* Header */
+        .dash-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .dash-greeting-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .dash-user-name {
+          font-size: 1.6rem;
+          font-weight: 800;
+          letter-spacing: -0.03em;
+          margin-top: 0.15rem;
+        }
+
+        .dash-header-right {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+
+        .dash-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid var(--border-color);
+        }
+
+        .dash-bell-btn {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .dash-bell-btn:hover {
+          background: #e8e8e8;
+        }
+
+        /* Adherence Summary Strip */
+        .adherence-summary-strip {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .adherence-label {
+          font-size: 0.68rem;
           font-weight: 600;
           color: var(--color-primary);
+          letter-spacing: 0.06em;
         }
 
-        .progress-visual-wrapper {
+        .adherence-big-number {
+          font-size: 2.2rem;
+          font-weight: 900;
+          letter-spacing: -0.04em;
+          line-height: 1.1;
+          color: var(--text-primary);
+        }
+
+        .adherence-sub-text {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+        }
+
+        .adherence-stat-left {
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Dark Chart Card */
+        .progress-chart-card {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .chart-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+
+        .chart-time-badge {
+          background: rgba(255,255,255,0.12);
+          color: white;
+          padding: 0.3rem 0.75rem;
+          border-radius: var(--radius-full);
+          font-size: 0.72rem;
+          font-weight: 600;
+        }
+
+        .progress-ring-row {
+          display: flex;
+          align-items: center;
+          gap: 2rem;
+          justify-content: center;
+        }
+
+        @media (max-width: 480px) {
+          .progress-ring-row {
+            gap: 1.25rem;
+          }
+        }
+
+        .progress-ring-wrapper {
           position: relative;
-          width: 160px;
-          height: 160px;
+          width: 130px;
+          height: 130px;
+          flex-shrink: 0;
         }
 
-        .progress-ring-container {
-          position: relative;
-        }
-
-        .progress-ring-circle-fg {
-          transform: rotate(-90deg);
-          transform-origin: 80px 80px;
-          transition: stroke-dashoffset var(--transition-slow);
-        }
-
-        .progress-value-label {
+        .ring-center-label {
           position: absolute;
           top: 50%;
           left: 50%;
@@ -451,292 +539,250 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
           align-items: center;
         }
 
-        .progress-value-label .percentage {
-          font-size: 2rem;
-          font-weight: 800;
-          color: var(--text-primary);
+        .ring-pct {
+          font-size: 1.8rem;
+          font-weight: 900;
+          color: white;
           line-height: 1;
         }
 
-        .progress-value-label .label {
-          font-size: 0.75rem;
-          color: var(--text-secondary);
-          margin-top: 0.25rem;
-        }
-
-        .streak-badge-banner {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          background: rgba(16, 185, 129, 0.15);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: var(--color-success);
-          padding: 0.5rem 1rem;
-          border-radius: var(--radius-sm);
-          font-size: 0.85rem;
-          font-weight: 600;
-          width: 100%;
-        }
-
-        .stats-quick-stats {
-          width: 100%;
-          display: flex;
-          border-top: 1px solid var(--border-color);
-          padding-top: 1.25rem;
-        }
-
-        .stat-col {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .stat-col.line-split {
-          border-left: 1px solid var(--border-color);
-        }
-
-        .stat-val {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-
-        .stat-lbl {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-        }
-
-        .actions-card {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .card-desc {
-          color: var(--text-secondary);
-          font-size: 0.85rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .actions-button-grid {
-          display: flex;
-          flex-direction: column;
-          gap: 0.85rem;
-          height: 100%;
-          justify-content: center;
-        }
-
-        .action-tile-btn {
-          display: flex;
-          align-items: center;
-          gap: 1.25rem;
-          text-align: left;
-          padding: 1.1rem;
-          border-radius: var(--radius-md);
-          border: 1px solid transparent;
-          background: rgba(255, 255, 255, 0.02);
-          cursor: pointer;
-          transition: all var(--transition-normal);
-        }
-
-        .action-tile-btn.primary-gradient {
-          background: linear-gradient(135deg, rgba(13, 148, 136, 0.15) 0%, rgba(99, 102, 241, 0.1) 100%);
-          border-color: rgba(13, 148, 136, 0.25);
-        }
-
-        .action-tile-btn.primary-gradient:hover {
-          border-color: var(--color-primary);
-          background: linear-gradient(135deg, rgba(13, 148, 136, 0.25) 0%, rgba(99, 102, 241, 0.2) 100%);
-          transform: translateY(-2px);
-          box-shadow: 0 4px 15px rgba(13, 148, 136, 0.15);
-        }
-
-        .action-tile-btn.outline-border {
-          border-color: var(--border-color);
-        }
-
-        .action-tile-btn.outline-border:hover {
-          border-color: rgba(255, 255, 255, 0.2);
-          background: rgba(255, 255, 255, 0.04);
-          transform: translateY(-2px);
-        }
-
-        .action-tile-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: var(--radius-sm);
-          background: var(--color-primary-glow);
-          color: var(--color-primary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .action-tile-icon.teal-tint {
-          background: rgba(13, 148, 136, 0.1);
-          color: var(--color-primary);
-        }
-
-        .action-tile-icon.indigo-tint {
-          background: rgba(99, 102, 241, 0.1);
-          color: var(--color-secondary);
-        }
-
-        .action-tile-text {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .action-tile-text .title {
-          font-weight: 600;
-          font-size: 1rem;
-          color: var(--text-primary);
-        }
-
-        .action-tile-text .desc {
-          font-size: 0.8rem;
-          color: var(--text-secondary);
+        .ring-sub {
+          font-size: 0.7rem;
+          color: rgba(255,255,255,0.5);
           margin-top: 0.15rem;
         }
 
-        /* Interaction alerts styling */
-        .interaction-alert-panel {
-          border-color: rgba(245, 158, 11, 0.4) !important;
-          background: rgba(245, 158, 11, 0.05);
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .alert-header {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-        }
-
-        .warning-pulse-icon {
-          color: var(--color-warning);
-          animation: pulseGlow 2s infinite;
-        }
-
-        .alert-list {
+        .ring-stats-col {
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
-          border-top: 1px solid rgba(245, 158, 11, 0.15);
-          padding-top: 1rem;
         }
 
-        .alert-item {
-          padding: 0.75rem;
-          border-radius: var(--radius-sm);
-          background: rgba(0, 0, 0, 0.25);
-          border-left: 3px solid var(--color-warning);
-        }
-
-        .alert-names {
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: var(--color-warning);
-        }
-
-        .alert-note {
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-          margin-top: 0.25rem;
-        }
-
-        /* Timeline schedule styling */
-        .timeline-card {
+        .ring-stat-item {
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
         }
 
-        .timeline-header {
-          border-bottom: 1px solid var(--border-color);
-          padding-bottom: 1rem;
+        .ring-stat-val {
+          font-size: 1.4rem;
+          font-weight: 800;
+          color: white;
+          line-height: 1.1;
         }
 
-        .empty-schedule-state {
+        .ring-stat-lbl {
+          font-size: 0.68rem;
+          color: rgba(255,255,255,0.45);
+        }
+
+        .perfect-day-banner {
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: 1rem;
-          padding: 3rem 0;
-          color: var(--text-secondary);
+          justify-content: center;
+          gap: 0.4rem;
+          background: rgba(76, 175, 80, 0.15);
+          color: #4caf50;
+          padding: 0.5rem 1rem;
+          border-radius: var(--radius-sm);
+          font-size: 0.8rem;
+          font-weight: 600;
         }
 
-        .timeline-slots {
+        /* Update Banner */
+        .update-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-full);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .update-banner:hover {
+          border-color: var(--border-color-hover);
+          box-shadow: var(--shadow-md);
+        }
+
+        .update-left {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+
+        .update-badge {
+          background: var(--text-primary);
+          color: white;
+          font-size: 0.65rem;
+          font-weight: 700;
+          padding: 0.2rem 0.5rem;
+          border-radius: var(--radius-full);
+          letter-spacing: 0.02em;
+        }
+
+        .update-text {
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        /* Quick Actions Hub */
+        .quick-hub-section {
           display: flex;
           flex-direction: column;
-          gap: 1.5rem;
         }
 
-        .timeline-slot-row {
+        .quick-hub-grid {
           display: grid;
-          grid-template-columns: 140px 1fr;
-          gap: 1.5rem;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.75rem;
         }
 
-        @media (max-width: 600px) {
-          .timeline-slot-row {
-            grid-template-columns: 1fr;
+        @media (max-width: 480px) {
+          .quick-hub-grid {
+            grid-template-columns: repeat(4, 1fr);
             gap: 0.5rem;
           }
         }
 
-        .slot-label-col {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          height: fit-content;
-          padding-top: 0.5rem;
-        }
-
-        .slot-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: var(--color-primary);
-          box-shadow: 0 0 8px var(--color-primary);
-        }
-
-        .slot-title {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: var(--text-secondary);
-          letter-spacing: 0.05em;
-        }
-
-        .slot-items-col {
+        .quick-hub-item {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 1rem 0.5rem;
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          background: var(--bg-card);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          font-family: var(--font-sans);
+          box-shadow: var(--shadow-sm);
         }
 
-        .dose-checklist-item {
+        .quick-hub-item:hover {
+          border-color: var(--border-color-hover);
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-md);
+        }
+
+        .hub-icon-circle {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: var(--bg-input);
           display: flex;
           align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          background: rgba(255, 255, 255, 0.015);
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-sm);
+          justify-content: center;
+          color: var(--text-primary);
           transition: all var(--transition-fast);
         }
 
-        .dose-checklist-item:hover {
-          border-color: rgba(255, 255, 255, 0.1);
-          background: rgba(255, 255, 255, 0.03);
+        .quick-hub-item:hover .hub-icon-circle {
+          background: var(--color-primary-glow);
+          color: var(--color-primary);
         }
 
-        .dose-checklist-item.checked-taken {
-          background: rgba(16, 185, 129, 0.04);
-          border-color: rgba(16, 185, 129, 0.25);
+        .quick-hub-item span {
+          font-size: 0.72rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+        }
+
+        /* Drug Interaction Warning */
+        .interaction-warning-card {
+          background: #fff5f5;
+          border: 1px solid rgba(229, 57, 53, 0.15);
+          border-radius: var(--radius-md);
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+
+        .warning-card-header {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-weight: 700;
+          font-size: 0.85rem;
+          color: var(--color-danger);
+        }
+
+        .warning-icon-pulse {
+          animation: pulseGlow 2s infinite;
+        }
+
+        .warning-body-text {
+          font-size: 0.8rem;
+          color: var(--color-danger);
+          line-height: 1.5;
+        }
+
+        /* Checklist Section */
+        .checklist-section {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .empty-schedule {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          padding: 2.5rem 0;
+          color: var(--text-muted);
+          text-align: center;
+        }
+
+        .checklist-slots {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+        }
+
+        .checklist-slot {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .slot-time-label {
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: var(--text-secondary);
+          letter-spacing: 0.02em;
+        }
+
+        .slot-items {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .dose-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.85rem 1rem;
+          background: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-sm);
+          transition: all var(--transition-fast);
+          box-shadow: var(--shadow-sm);
+        }
+
+        .dose-item:hover {
+          border-color: var(--border-color-hover);
+          box-shadow: var(--shadow-md);
+        }
+
+        .dose-item.taken {
+          background: #f0fdf4;
+          border-color: rgba(46, 125, 50, 0.15);
         }
 
         .dose-check-btn {
@@ -748,67 +794,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
           justify-content: center;
           color: var(--text-muted);
           transition: transform var(--transition-fast);
+          flex-shrink: 0;
         }
 
         .dose-check-btn:hover {
           transform: scale(1.1);
         }
 
-        .check-success-icon {
+        .icon-taken {
           color: var(--color-success);
         }
 
-        .check-pending-icon {
+        .icon-pending {
           color: var(--text-muted);
         }
 
-        .dose-check-btn:hover .check-pending-icon {
+        .dose-check-btn:hover .icon-pending {
           color: var(--color-primary);
         }
 
-        .dose-details {
+        .dose-info {
           display: flex;
           flex-direction: column;
           flex: 1;
+          min-width: 0;
         }
 
-        .dose-details .med-name {
+        .dose-name {
           font-weight: 600;
-          font-size: 1rem;
+          font-size: 0.9rem;
           color: var(--text-primary);
         }
 
-        .dose-checklist-item.checked-taken .dose-details .med-name {
+        .dose-item.taken .dose-name {
           text-decoration: line-through;
           color: var(--text-muted);
         }
 
-        .dose-details .med-dosage {
+        .dose-strength {
           font-weight: 500;
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-          background: rgba(255, 255, 255, 0.06);
-          padding: 0.1rem 0.4rem;
-          border-radius: var(--radius-xs);
-          margin-left: 0.4rem;
-        }
-
-        .dose-details .med-instructions {
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-          margin-top: 0.15rem;
-        }
-
-        .taken-time-badge {
           font-size: 0.75rem;
-          color: var(--color-success);
-          font-weight: 500;
-          background: var(--color-success-glow);
-          padding: 0.2rem 0.5rem;
+          color: var(--text-secondary);
+          background: var(--bg-input);
+          padding: 0.05rem 0.35rem;
           border-radius: var(--radius-xs);
+          margin-left: 0.3rem;
         }
 
-        .voice-btn {
+        .dose-instructions {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          margin-top: 0.1rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .taken-badge {
+          font-size: 0.68rem;
+          color: var(--color-success);
+          font-weight: 600;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .speak-btn {
           background: transparent;
           border: none;
           color: var(--text-muted);
@@ -816,14 +866,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 0.4rem;
+          padding: 0.35rem;
           border-radius: 50%;
           transition: all var(--transition-fast);
+          flex-shrink: 0;
         }
 
-        .voice-btn:hover {
-          color: var(--color-accent);
-          background: var(--color-accent-glow);
+        .speak-btn:hover {
+          color: var(--color-primary);
+          background: var(--color-primary-glow);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+          .dash-user-name {
+            font-size: 1.3rem;
+          }
+          .adherence-big-number {
+            font-size: 1.8rem;
+          }
+          .update-text {
+            font-size: 0.75rem;
+          }
+          .ring-pct {
+            font-size: 1.5rem;
+          }
         }
       `}</style>
     </div>
