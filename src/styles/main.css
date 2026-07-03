@@ -860,6 +860,10 @@ input:checked + .slider:before {
 .dropzone.has-file {
   border-style: solid;
   border-color: var(--color-primary);
+  height: 280px;
+  overflow: hidden;
+  padding: 0;
+  background: white;
 }
 
 .dropzone-prompt {
@@ -902,12 +906,12 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.5rem;
 }
 
 .preview-presc-img {
   max-width: 100%;
-  max-height: 250px;
+  max-height: 100%;
   object-fit: contain;
   border-radius: var(--radius-xs);
 }

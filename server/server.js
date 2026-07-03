@@ -158,14 +158,18 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
       rawText = ocrData.predictions[0].text;
     } else if (ocrData.choices && ocrData.choices[0]?.message?.content) {
       rawText = ocrData.choices[0].message.content;
+    } else if (ocrData.data && Array.isArray(ocrData.data)) {
+      rawText = ocrData.data
+        .map(d => d.text_detections?.map(td => td.text_prediction?.text || '').join(' ') || '')
+        .join('\n');
     } else {
       rawText = JSON.stringify(ocrData);
     }
 
     console.log('Extracted raw text:', rawText);
-    console.log('Sending text to NVIDIA Llama-3.3-70b-Instruct...');
+    console.log('Sending text to NVIDIA Llama-3.1-8b-Instruct...');
 
-    // 2. Call Llama 3.3 70b
+    // 2. Call Llama 3.1 8b
     const llmResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -173,7 +177,7 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.3-70b-instruct',
+        model: 'meta/llama-3.1-8b-instruct',
         messages: [
           {
             role: 'system',
