@@ -131,6 +131,63 @@ const formatMed = (mongooseMed) => {
   };
 };
 
+// Helper function to detect non-medicine items (like hospital names, contact details, emails, physical addresses, etc.)
+const isNonMedicine = (name) => {
+  if (!name || typeof name !== 'string') return true;
+  const clean = name.trim().toLowerCase();
+  
+  // Exclude empty or single-character names
+  if (clean.length < 2) return true;
+  
+  // 1. Email address check
+  if (clean.includes('@')) return true;
+  
+  // 2. URL check
+  if (clean.includes('http://') || clean.includes('https://') || clean.includes('www.')) return true;
+  
+  // 3. Phone number check (looks like phone number or contains phone keywords)
+  if (/\b(?:phone|tel|telephone|fax|mob|mobile|cell|contact)\b/i.test(clean)) return true;
+  if (/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/.test(clean)) return true;
+  
+  // 4. Clinical header/Institutional / Doctor checks
+  if (/\b(?:hospital|clinic|medical center|pharmacy|specialty|department|dept|office|physician|prescriber|doctor|dentist|dds|md|dr)\b/i.test(clean)) return true;
+  
+  // 5. Physical Address checks (keywords like street/rd + digits)
+  if (/\b(?:street|st|rd|road|ave|avenue|blvd|boulevard|lane|ln|drive|dr|suite|ste|floor|fl|zip|zipcode|p\.?o\.?\s*box)\b/i.test(clean)) {
+    if (/\d+/.test(clean)) return true;
+  }
+  
+  return false;
+};
+
+// Helper function to sanitize medication instructions (removes phone numbers, emails, URLs)
+const sanitizeInstructions = (text) => {
+  if (!text || typeof text !== 'string') return 'Take as directed';
+  let clean = text.trim();
+  
+  // 1. Remove phone keywords and numbers (e.g. "Ph:++91 810811211", "tel: 123-456", "Phone: 555-1234")
+  clean = clean.replace(/\b(?:phone|tel|telephone|fax|mob|mobile|cell|contact|ph\.?:?)\s*(?:\+*\d+[-.\s]*)+/ig, '');
+  
+  // 2. Remove standalone phone numbers
+  clean = clean.replace(/(?:\+\+?\d{1,3}[-.\s]*)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '');
+  clean = clean.replace(/(?:\+\+?\d{2}\s*)?\d{10}\b/g, '');
+  
+  // 3. Remove email addresses
+  clean = clean.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '');
+  
+  // 4. Remove URLs
+  clean = clean.replace(/\b(?:https?:\/\/|www\.)\S+/gi, '');
+  
+  // 5. Clean up multiple spaces and trailing punctuations
+  clean = clean.replace(/\s+/g, ' ').trim();
+  clean = clean.replace(/^[\s,.:;|-]+|[\s,.:;|-]+$/g, '').trim();
+  
+  if (clean.length === 0) {
+    return 'Take as directed';
+  }
+  return clean;
+};
+
 // --- API ROUTES ---
 
 // 1. OCR + LLM Parsing Endpoint
@@ -138,6 +195,7 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
   try {
     let rawText = '';
     const sampleId = req.body.sampleId;
+    const language = req.body.language || 'en';
 
     if (sampleId && (sampleId === 'pres_01' || sampleId === 'pres_02')) {
       console.log(`Processing sample ${sampleId} direct parsing...`);
@@ -226,13 +284,18 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: `You are a medical prescription parser. You receive raw OCR text extracted from a document image. Your job is to find any medications, dosages, doctor info, and instructions in the text.
+            content: `You are a medical prescription parser. You receive raw OCR text extracted from a document image. Your job is to extract medications, dosages, doctor info, and instructions into a clean structured format.
 
-IMPORTANT RULES:
-- If the document contains medications/prescriptions, extract them.
-- If the document does NOT appear to be a prescription (e.g. it's a list, receipt, letter, or non-medical document), still return valid JSON but with an empty extractedMeds array and set doctorName to "Not a prescription document".
-- Output ONLY a valid JSON object. No markdown, no explanation, no extra text.
-- Keep the JSON compact and short.
+CRITICAL RULES:
+1. ONLY extract actual pharmaceutical medications (brand or generic drug names, e.g. "Lisinopril", "Amoxicillin", "Aspirin") in the "extractedMeds" list.
+2. DO NOT include clinical or hospital names, clinics, physical addresses, email addresses, websites, telephone/fax numbers, patient registration details, or doctor contact info anywhere in the "extractedMeds" array.
+3. The "name" field for each medicine MUST be ONLY the drug name (e.g., "Lisinopril", "Amoxicillin"). It must NEVER be a clinic name (e.g., "St. Jude Hospital", "Green City Clinic"), address, email, phone number, doctor name, signature line, or header. If a block of text does not represent a real pharmaceutical drug or medicine name, DO NOT include it in the "extractedMeds" array.
+4. The "dosage" field MUST contain only the strength or dosing unit (e.g., "10mg", "500mg", "1 tablet"). NEVER populate it with street addresses, phone numbers, email addresses, or clinic metadata.
+5. The "instructions" field MUST only contain directions for taking the drug (e.g., "Take 1 tablet daily before bed", "with meals"). NEVER include clinic operating hours, general disclaimers, address details, phone numbers, or pharmacy location details in instructions.
+6. The "timing" array MUST contain only one or more of: "morning", "afternoon", "evening", "night". Map Latin abbreviations (like QD, BID, TID, QID, QHS, 1-0-1, 1-1-1) to these slots correctly.
+7. If the document does NOT appear to be a prescription or has no medications, return an empty "extractedMeds" array and set "doctorName" to "Not a prescription document".
+8. Output ONLY a valid JSON object. No markdown formatting, no explanations.
+${language === 'bn' ? '9. IMPORTANT: Translate the "specialty", "instructions", and "duration" fields to Bangla (Bengali) language (e.g. translate "Take with food" to "খাবারের সাথে নিন", "7 days" to "৭ দিন"). Keep the "name" field in English or transliterated to Bangla, and keep "timing" values strictly in English.' : ''}
 
 JSON schema:
 {"doctorName":"string","specialty":"string","date":"YYYY-MM-DD","extractedMeds":[{"name":"string","dosage":"string","timing":["morning"],"instructions":"string","duration":"string","refillsLeft":0}]}`
@@ -292,15 +355,33 @@ JSON schema:
       parsedResult.extractedMeds = [];
     }
 
-    // Normalize each med to ensure required fields exist
-    parsedResult.extractedMeds = parsedResult.extractedMeds.map(med => ({
-      name: med.name || 'Unknown Medicine',
-      dosage: med.dosage || 'As directed',
-      timing: Array.isArray(med.timing) ? med.timing : ['morning'],
-      instructions: med.instructions || 'Take as directed',
-      duration: med.duration || '7 days',
-      refillsLeft: typeof med.refillsLeft === 'number' ? med.refillsLeft : 0
-    }));
+    // Normalize and filter each med to ensure safety and precision
+    parsedResult.extractedMeds = parsedResult.extractedMeds
+      .filter(med => {
+        // Discard any entries that are clearly not medications (e.g. hospital headers, contact info)
+        return med && med.name && !isNonMedicine(med.name);
+      })
+      .map(med => {
+        let dosage = med.dosage || 'As directed';
+        let instructions = med.instructions || 'Take as directed';
+
+        // Clean up dosage or instructions if they contain obvious contact info or address-like details
+        if (isNonMedicine(dosage)) {
+          dosage = 'As directed';
+        }
+        
+        // Sanitize instructions to strip out phone numbers, URLs, emails
+        instructions = sanitizeInstructions(instructions);
+
+        return {
+          name: med.name.trim(),
+          dosage: dosage.trim(),
+          timing: Array.isArray(med.timing) ? med.timing : ['morning'],
+          instructions: instructions.trim(),
+          duration: med.duration || '7 days',
+          refillsLeft: typeof med.refillsLeft === 'number' ? med.refillsLeft : 0
+        };
+      });
 
     // Save to Database or Memory
     try {
@@ -704,7 +785,7 @@ app.get('/api/email-logs', async (req, res) => {
 
 // 13. AI Health Guide Chat Endpoint (strictly limited to health and medicine)
 app.post('/api/chat-guide', async (req, res) => {
-  const { messages } = req.body;
+  const { messages, language } = req.body;
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'Messages array is required.' });
   }
@@ -721,7 +802,8 @@ app.post('/api/chat-guide', async (req, res) => {
         messages: [
           {
             role: 'system',
-            content: `You are MedDNA AI, a highly professional clinical health and medicine assistant. You are strictly restricted to guiding the user on medicine, health, prescription guidelines, wellness, and medical instructions. If the user asks about ANY topic unrelated to medicine, health, biology, or healthcare (such as coding, general knowledge, sports, history, business, entertainment, etc.), you must politely decline to answer and remind them that you are only qualified to assist with medical and health-related topics. Keep your answers concise, clear, and informative.`
+            content: `You are MedDNA AI, a highly professional clinical health and medicine assistant. You are strictly restricted to guiding the user on medicine, health, prescription guidelines, wellness, and medical instructions. If the user asks about ANY topic unrelated to medicine, health, biology, or healthcare (such as coding, general knowledge, sports, history, business, entertainment, etc.), you must politely decline to answer and remind them that you are only qualified to assist with medical and health-related topics. Keep your answers concise, clear, and informative.
+${language === 'bn' ? 'IMPORTANT: You must respond and communicate strictly in Bangla (Bengali) language. Translate all explanations, advice, and responses to Bangla. If declining non-medical queries, you must decline in Bangla (e.g. "দুঃখিত, আমি কেবল চিকিৎসা এবং/অথবা স্বাস্থ্য-সম্পর্কিত বিষয়ে সাহায্য করতে পারি।").' : ''}`
           },
           ...messages
         ],

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const MedsList: React.FC = () => {
-  const { medicines, removeMedicine, speakText, stopSpeech, activeSpeechId, interactionWarnings, requestRefill } = useMed();
+  const { medicines, removeMedicine, speakText, stopSpeech, activeSpeechId, interactionWarnings, requestRefill, language, t } = useMed();
   const [selectedMedInfo, setSelectedMedInfo] = useState<MedicineInfo | null>(null);
   const [loadingSafetyInfo, setLoadingSafetyInfo] = useState(false);
   const [refillRequests, setRefillRequests] = useState<Record<string, 'idle' | 'pending' | 'success'>>({});
@@ -63,8 +63,8 @@ export const MedsList: React.FC = () => {
   return (
     <div className="meds-list-view animate-fade-in">
       <header className="view-header">
-        <h1>My Active Medications</h1>
-        <p>View your active prescription schedules, listen to directions, or review drug interaction alerts.</p>
+        <h1>{t('myActiveMeds')}</h1>
+        <p>{t('myActiveMedsSub')}</p>
       </header>
 
       {/* Interaction Warning Panel */}
@@ -73,8 +73,8 @@ export const MedsList: React.FC = () => {
           <div className="warning-head">
             <AlertTriangle size={24} className="warning-siren" />
             <div>
-              <h3>Drug-to-Drug Interaction Alerts ({interactionWarnings.length})</h3>
-              <p>Warning: Overlapping active drugs in your system have documented medical interaction risks.</p>
+              <h3>{t('drugInteractionAlert')} ({interactionWarnings.length})</h3>
+              <p>{t('drugInteractionWarningSub')}</p>
             </div>
           </div>
           <div className="warning-details-list">
@@ -90,7 +90,7 @@ export const MedsList: React.FC = () => {
         medicines.length > 1 && (
           <div className="glass-card interactions-safe-card">
             <ShieldCheck size={20} className="safe-icon" />
-            <span>AI Safety Shield Active: No overlapping drug interactions found among your current list.</span>
+            <span>{t('aiSafetyShieldActive')}</span>
           </div>
         )
       )}
@@ -99,8 +99,8 @@ export const MedsList: React.FC = () => {
       {medicines.length === 0 ? (
         <div className="glass-card empty-meds-card">
           <FileText size={48} />
-          <h3>No Active Medicines</h3>
-          <p>Your current database is empty. You can add medicines by uploading a prescription image in the OCR Scanner page.</p>
+          <h3>{t('noActiveMeds')}</h3>
+          <p>{t('noActiveMedsSub')}</p>
         </div>
       ) : (
         <div className="meds-grid">
@@ -137,11 +137,11 @@ export const MedsList: React.FC = () => {
                   <div className="detail-meta">
                     <div className="detail-meta-item">
                       <Calendar size={14} />
-                      <span>Duration: {med.duration}</span>
+                      <span>{t('durationLabel')}: {med.duration}</span>
                     </div>
                     <div className={`detail-meta-item ${med.refillsLeft <= 1 ? 'refill-alert' : ''}`} style={med.refillsLeft <= 1 ? { color: 'var(--color-danger)', fontWeight: 'bold' } : {}}>
                       <RotateCcw size={14} />
-                      <span>Refills left: {med.refillsLeft}</span>
+                      <span>{t('refillsLeft')}: {med.refillsLeft}</span>
                       {med.refillsLeft <= 1 && (
                         <button
                           className="btn btn-warning btn-xs refill-action-btn"
@@ -159,26 +159,34 @@ export const MedsList: React.FC = () => {
                             cursor: refillRequests[med.id] === 'pending' ? 'not-allowed' : 'pointer'
                           }}
                         >
-                          {refillRequests[med.id] === 'pending' && 'Requesting...'}
-                          {refillRequests[med.id] === 'success' && 'Approved +3'}
-                          {(!refillRequests[med.id] || refillRequests[med.id] === 'idle') && 'Request Refill'}
+                          {refillRequests[med.id] === 'pending' && (language === 'bn' ? 'অনুরোধ করা হচ্ছে...' : 'Requesting...')}
+                          {refillRequests[med.id] === 'success' && (language === 'bn' ? 'অনুমোদিত +৩' : 'Approved +3')}
+                          {(!refillRequests[med.id] || refillRequests[med.id] === 'idle') && t('requestRefill')}
                         </button>
                       )}
                     </div>
                   </div>
 
                   <div className="schedule-box">
-                    <span className="box-lbl"><Clock size={12} /> Schedule timings:</span>
+                    <span className="box-lbl"><Clock size={12} /> {t('scheduleTimings')}:</span>
                     <div className="timing-chips">
-                      {med.timing.map(t => (
-                        <span key={t} className="timing-chip">{t.toUpperCase()}</span>
-                      ))}
+                      {med.timing.map(time => {
+                        const timeLabels: Record<string, string> = {
+                          morning: language === 'bn' ? 'সকাল' : 'MORNING',
+                          afternoon: language === 'bn' ? 'দুপুর' : 'AFTERNOON',
+                          evening: language === 'bn' ? 'সন্ধ্যা' : 'EVENING',
+                          night: language === 'bn' ? 'রাত' : 'NIGHT'
+                        };
+                        return (
+                          <span key={time} className="timing-chip">{timeLabels[time] || time.toUpperCase()}</span>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {med.instructions && (
                     <div className="instructions-box">
-                      <span className="box-lbl">Directions:</span>
+                      <span className="box-lbl">{t('directionsLabel')}:</span>
                       <p>"{med.instructions}"</p>
                     </div>
                   )}
@@ -187,23 +195,33 @@ export const MedsList: React.FC = () => {
                 <div className="med-card-actions">
                   <button 
                     className="btn btn-secondary action-icon-btn"
-                    onClick={() => speakText(`Active drug: ${med.name}. Dosage: ${med.dosage}. Frequency: ${med.timing.join(' and ')}. Intake instructions: ${med.instructions}`)}
-                    title="Read instructions aloud"
+                    onClick={() => {
+                      const speechText = language === 'bn' 
+                        ? `ওষুধের নাম: ${med.name}। মাত্রা: ${med.dosage}। সময়সূচী: ${med.timing.map(time => {
+                            if (time === 'morning') return 'সকাল';
+                            if (time === 'afternoon') return 'দুপুর';
+                            if (time === 'evening') return 'সন্ধ্যা';
+                            return 'রাত';
+                          }).join(' এবং ')}। নির্দেশাবলী: ${med.instructions || 'নেই'}`
+                        : `Active drug: ${med.name}. Dosage: ${med.dosage}. Frequency: ${med.timing.join(' and ')}. Intake instructions: ${med.instructions || 'None'}`;
+                      speakText(speechText);
+                    }}
+                    title={language === 'bn' ? 'নির্দেশাবলী শুনুন' : "Read instructions aloud"}
                   >
-                    <Volume2 size={16} /> Read instructions
+                    <Volume2 size={16} /> {t('readInstructions')}
                   </button>
 
                   <button 
                     className="btn btn-secondary action-icon-btn"
                     onClick={() => handleOpenInfo(med.name)}
                   >
-                    <Info size={16} /> Clinical Info
+                    <Info size={16} /> {t('clinicalInfo')}
                   </button>
 
                   <button 
                     className="btn btn-secondary remove-btn-icon"
                     onClick={() => removeMedicine(med.id)}
-                    title="Remove medicine"
+                    title={t('removeMedicine')}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -221,14 +239,14 @@ export const MedsList: React.FC = () => {
             {loadingSafetyInfo ? (
               <div className="drawer-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem', color: 'var(--text-secondary)' }}>
                 <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid var(--border-color)', borderTop: '3px solid var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Querying Llama Safety Profiles...</p>
+                <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{language === 'bn' ? 'লামা সেফটি প্রোফাইল অনুসন্ধান করা হচ্ছে...' : 'Querying Llama Safety Profiles...'}</p>
               </div>
             ) : selectedMedInfo && (
               <>
                 <div className="drawer-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
                   <div>
                     <span className="drawer-category">{selectedMedInfo.category}</span>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{selectedMedInfo.name} Safety Profile</h2>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{selectedMedInfo.name} {language === 'bn' ? 'সেফটি প্রোফাইল' : 'Safety Profile'}</h2>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     {activeSpeechId === selectedMedInfo.name ? (
@@ -244,19 +262,21 @@ export const MedsList: React.FC = () => {
                           onClick={stopSpeech}
                           style={{ padding: '0.15rem 0.4rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem', height: '22px' }}
                         >
-                          <VolumeX size={12} /> Stop
+                          <VolumeX size={12} /> {t('stop')}
                         </button>
                       </div>
                     ) : (
                       <button 
                         className="btn btn-primary btn-xs speech-btn" 
-                        onClick={() => speakText(
-                          `Safety Profile for ${selectedMedInfo.name}. Category: ${selectedMedInfo.category}. Primary uses: ${selectedMedInfo.uses.join('. ')}. Side effects: ${selectedMedInfo.sideEffects.join('. ')}. Precautions: ${selectedMedInfo.precautions.join('. ')}.`,
-                          selectedMedInfo.name
-                        )}
+                        onClick={() => {
+                          const safetySpeech = language === 'bn'
+                            ? `${selectedMedInfo.name} এর সেফটি প্রোফাইল। বিভাগ: ${selectedMedInfo.category}। প্রাথমিক ব্যবহার: ${selectedMedInfo.uses.join('. ')}। পার্শ্বপ্রতিক্রিয়া: ${selectedMedInfo.sideEffects.join('. ')}। সতর্কতা: ${selectedMedInfo.precautions.join('. ')}।`
+                            : `Safety Profile for ${selectedMedInfo.name}. Category: ${selectedMedInfo.category}. Primary uses: ${selectedMedInfo.uses.join('. ')}. Side effects: ${selectedMedInfo.sideEffects.join('. ')}. Precautions: ${selectedMedInfo.precautions.join('. ')}.`;
+                          speakText(safetySpeech, selectedMedInfo.name);
+                        }}
                         style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem', height: '24px' }}
                       >
-                        <Volume2 size={12} /> Listen Safely
+                        <Volume2 size={12} /> {t('listenSafely')}
                       </button>
                     )}
                     <button className="close-drawer-btn" onClick={handleCloseInfo}>
@@ -268,7 +288,7 @@ export const MedsList: React.FC = () => {
                 <div className="drawer-body">
                   {/* Uses */}
                   <div className="drawer-section">
-                    <h4>Primary Medical Uses</h4>
+                    <h4>{t('primaryUses')}</h4>
                     <ul>
                       {selectedMedInfo.uses.map((use, idx) => (
                         <li key={idx}>{use}</li>
@@ -278,7 +298,7 @@ export const MedsList: React.FC = () => {
 
                   {/* Side Effects */}
                   <div className="drawer-section">
-                    <h4>Common Side Effects</h4>
+                    <h4>{t('sideEffects')}</h4>
                     <ul className="side-effects-list">
                       {selectedMedInfo.sideEffects.map((effect, idx) => (
                         <li key={idx} className="side-effect-item">{effect}</li>
@@ -288,7 +308,7 @@ export const MedsList: React.FC = () => {
 
                   {/* Precautions */}
                   <div className="drawer-section warning-section">
-                    <h4>Clinical Precautions</h4>
+                    <h4>{t('clinicalPrecautions')}</h4>
                     <ul>
                       {selectedMedInfo.precautions.map((prec, idx) => (
                         <li key={idx}>{prec}</li>
@@ -299,8 +319,8 @@ export const MedsList: React.FC = () => {
                   {/* Interactions list */}
                   {selectedMedInfo.interactions.length > 0 && (
                     <div className="drawer-section danger-section">
-                      <h4>Documented Drug Conflicts</h4>
-                      <p className="interact-sub">Do not take with the following drugs:</p>
+                      <h4>{t('drugConflicts')}</h4>
+                      <p className="interact-sub">{t('drugConflictsSub')}</p>
                       <div className="drawer-interact-pills">
                         {selectedMedInfo.interactions.map((interact, idx) => (
                           <span key={idx} className="interact-badge">{interact}</span>

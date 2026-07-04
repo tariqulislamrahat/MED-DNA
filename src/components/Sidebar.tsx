@@ -28,17 +28,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed, 
   setCollapsed 
 }) => {
-  const { user, logout, triggerSOS, medicines } = useMed();
+  const { user, logout, triggerSOS, medicines, language, setLanguage, t } = useMed();
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'scanner', label: 'OCR Scanner', icon: ScanLine },
-    { id: 'tracker', label: 'Dose Tracker', icon: CalendarDays },
-    { id: 'meds', label: 'Medicine List', icon: Pill, badge: medicines.length > 0 ? medicines.length : undefined },
-    { id: 'pharmacy', label: 'Find Pharmacy', icon: MapPin },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'reminders', label: 'Reminders & SOS', icon: BellRing },
-    { id: 'aiguide', label: 'AI Health Guide', icon: MessageSquare }
+    { id: 'dashboard', label: t('dashboard'), icon: LayoutDashboard },
+    { id: 'scanner', label: t('scanner'), icon: ScanLine },
+    { id: 'tracker', label: t('tracker'), icon: CalendarDays },
+    { id: 'meds', label: t('meds'), icon: Pill, badge: medicines.length > 0 ? medicines.length : undefined },
+    { id: 'pharmacy', label: t('pharmacy'), icon: MapPin },
+    { id: 'analytics', label: t('analytics'), icon: BarChart3 },
+    { id: 'reminders', label: t('reminders'), icon: BellRing },
+    { id: 'aiguide', label: t('aiguide'), icon: MessageSquare }
   ];
 
   if (!user) return null;
@@ -82,10 +82,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer */}
         <div className="sidebar-footer">
+          {/* Language Toggle */}
+          <button 
+            className="sidebar-lang-btn" 
+            onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
+            title={language === 'en' ? 'বাংলায় দেখুন' : 'Switch to English'}
+          >
+            <span>🌐</span>
+            {!collapsed && <span style={{ marginLeft: '0.4rem' }}>{language === 'en' ? 'বাংলা (BN)' : 'English (EN)'}</span>}
+          </button>
+
           {!collapsed && (
             <button className="sidebar-sos-btn" onClick={triggerSOS}>
               <ShieldAlert size={16} />
-              <span>EMERGENCY SOS</span>
+              <span>{t('emergencySos')}</span>
             </button>
           )}
           
@@ -97,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="profile-email">{user.email}</span>
               </div>
             )}
-            <button className="logout-btn" onClick={logout} title="Sign Out">
+            <button className="logout-btn" onClick={logout} title={t('signOut')}>
               <LogOut size={16} />
             </button>
           </div>
@@ -327,6 +337,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         .logout-btn:hover {
           color: var(--color-danger);
+        }
+
+        .sidebar-lang-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
+          padding: 0.6rem;
+          border-radius: var(--radius-sm);
+          font-family: var(--font-sans);
+          font-weight: 600;
+          font-size: 0.78rem;
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .sidebar-lang-btn:hover {
+          border-color: var(--border-color-hover);
+          background: #f1f5f9;
         }
 
         @media (max-width: 768px) {

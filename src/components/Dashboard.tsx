@@ -30,7 +30,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
     speakText,
     interactionWarnings,
     emailLogs,
-    fetchEmailLogs
+    fetchEmailLogs,
+    language,
+    t
   } = useMed();
 
   React.useEffect(() => {
@@ -38,7 +40,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
   }, []);
   
   const todayStr = new Date().toISOString().split('T')[0];
-  const formattedDate = new Date().toLocaleDateString('en-US', {
+  const formattedDate = new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric'
@@ -74,10 +76,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
   // Group doses by timing slot
   const timeSlots = ['morning', 'afternoon', 'evening', 'night'];
   const timeSlotLabels: Record<string, string> = {
-    morning: '🌅 Morning',
-    afternoon: '☀️ Afternoon',
-    evening: '🌆 Evening',
-    night: '🌙 Night'
+    morning: t('morningSlot'),
+    afternoon: t('afternoonSlot'),
+    evening: t('eveningSlot'),
+    night: t('nightSlot')
   };
 
   // SVG ring calculations
@@ -90,7 +92,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
       {/* Welcome Header */}
       <header className="dash-header">
         <div className="dash-header-left">
-          <span className="dash-greeting-label">WELCOME BACK</span>
+          <span className="dash-greeting-label">{t('welcomeBack')}</span>
           <h1 className="dash-user-name">{user?.name || 'User'}</h1>
         </div>
         <div className="dash-header-right">
@@ -104,7 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
       {/* Adherence Summary Bar */}
       <div className="adherence-summary-strip">
         <div className="adherence-stat-left">
-          <span className="adherence-label">TODAY'S PROGRESS</span>
+          <span className="adherence-label">{t('todaysProgress')}</span>
           <span className="adherence-big-number">{takenDosesCount}/{totalDosesCount}</span>
           <span className="adherence-sub-text">{formattedDate}</span>
         </div>
@@ -114,10 +116,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
       <div className="dark-card progress-chart-card">
         <div className="chart-card-header">
           <div>
-            <h3 style={{ color: 'white', fontSize: '1rem' }}>Adherence Progress</h3>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>Today's dose completion</p>
+            <h3 style={{ color: 'white', fontSize: '1rem' }}>{t('adherenceProgress')}</h3>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>{t('todaysCompletion')}</p>
           </div>
-          <span className="chart-time-badge">Today</span>
+          <span className="chart-time-badge">{language === 'bn' ? 'আজ' : 'Today'}</span>
         </div>
 
         <div className="progress-ring-row">
@@ -142,22 +144,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
             </svg>
             <div className="ring-center-label">
               <span className="ring-pct">{progressPercentage}%</span>
-              <span className="ring-sub">Done</span>
+              <span className="ring-sub">{language === 'bn' ? 'সম্পন্ন' : 'Done'}</span>
             </div>
           </div>
 
           <div className="ring-stats-col">
             <div className="ring-stat-item">
               <span className="ring-stat-val">{medicines.length}</span>
-              <span className="ring-stat-lbl">Active Meds</span>
+              <span className="ring-stat-lbl">{t('activeMeds')}</span>
             </div>
             <div className="ring-stat-item">
               <span className="ring-stat-val">{takenDosesCount}</span>
-              <span className="ring-stat-lbl">Doses Taken</span>
+              <span className="ring-stat-lbl">{t('dosesTaken')}</span>
             </div>
             <div className="ring-stat-item">
               <span className="ring-stat-val">{totalDosesCount - takenDosesCount}</span>
-              <span className="ring-stat-lbl">Remaining</span>
+              <span className="ring-stat-lbl">{t('remaining')}</span>
             </div>
           </div>
         </div>
@@ -165,7 +167,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
         {progressPercentage === 100 && totalDosesCount > 0 && (
           <div className="perfect-day-banner">
             <Sparkles size={14} />
-            <span>Perfect day! All doses completed.</span>
+            <span>{t('perfectDay')}</span>
           </div>
         )}
       </div>
@@ -174,8 +176,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
       {medicines.length > 0 && (
         <div className="update-banner" onClick={() => setCurrentTab('tracker')}>
           <div className="update-left">
-            <span className="update-badge">● TRACKER</span>
-            <span className="update-text">View your weekly dose history & streaks</span>
+            <span className="update-badge">● {language === 'bn' ? 'ট্র্যাকার' : 'TRACKER'}</span>
+            <span className="update-text">{language === 'bn' ? 'আপনার সাপ্তাহিক ডোজের ইতিহাস ও ধারাবাহিকতা দেখুন' : 'View your weekly dose history & streaks'}</span>
           </div>
           <ArrowRight size={18} />
         </div>
@@ -187,23 +189,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
         <div className="dash-col-left">
           {/* Quick Action Hub */}
           <div className="quick-hub-section">
-            <span className="section-title"><Sparkles size={14} /> QUICK ACTIONS</span>
+            <span className="section-title"><Sparkles size={14} /> {t('quickActions')}</span>
             <div className="quick-hub-grid">
               <button className="quick-hub-item" onClick={() => setCurrentTab('scanner')}>
                 <div className="hub-icon-circle"><UploadCloud size={20} /></div>
-                <span>Scan Rx</span>
+                <span>{t('scanRx')}</span>
               </button>
               <button className="quick-hub-item" onClick={onOpenAddModal}>
                 <div className="hub-icon-circle"><Plus size={20} /></div>
-                <span>Add Med</span>
+                <span>{t('addMed')}</span>
               </button>
               <button className="quick-hub-item" onClick={() => setCurrentTab('meds')}>
                 <div className="hub-icon-circle"><Pill size={20} /></div>
-                <span>Medicines</span>
+                <span>{t('medicinesTitle')}</span>
               </button>
               <button className="quick-hub-item" onClick={() => setCurrentTab('pharmacy')}>
                 <div className="hub-icon-circle"><MapPin size={20} /></div>
-                <span>Pharmacy</span>
+                <span>{t('pharmacyTitle')}</span>
               </button>
             </div>
           </div>
@@ -213,7 +215,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
             <div className="interaction-warning-card">
               <div className="warning-card-header">
                 <AlertTriangle size={18} className="warning-icon-pulse" />
-                <span>Drug Interaction Alert ({interactionWarnings.length})</span>
+                <span>{t('drugInteractionAlert')} ({interactionWarnings.length})</span>
               </div>
               <p className="warning-body-text">
                 {interactionWarnings[0].medA} + {interactionWarnings[0].medB}: {interactionWarnings[0].note}
@@ -226,16 +228,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
             <div className="interaction-warning-card refill-warning-dashboard" style={{ borderColor: 'rgba(234, 179, 8, 0.4)', background: 'rgba(234, 179, 8, 0.05)', marginTop: '0.75rem' }}>
               <div className="warning-card-header" style={{ color: '#eab308' }}>
                 <RotateCcw size={18} />
-                <span>Low Refills Alert ({medicines.filter(m => (m.refillsLeft || 0) <= 1).length})</span>
+                <span>{t('lowRefillsAlert')} ({medicines.filter(m => (m.refillsLeft || 0) <= 1).length})</span>
               </div>
               <p className="warning-body-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                <span><strong>{medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].name}</strong> has only {medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].refillsLeft} refills left. Click to request doctor refill.</span>
+                <span><strong>{medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].name}</strong> has only {medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].refillsLeft} {t('refillsLeft')}</span>
                 <button 
                   className="btn btn-warning btn-xs" 
                   onClick={() => setCurrentTab('meds')}
                   style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', background: '#eab308', color: 'black', border: 'none', borderRadius: '3px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                 >
-                  Manage Refills
+                  {t('manageRefills')}
                 </button>
               </p>
             </div>
@@ -247,30 +249,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
               <span className="dash-stat-icon">💊</span>
               <div>
                 <span className="dash-stat-number">{medicines.length}</span>
-                <span className="dash-stat-label">Active Medicines</span>
+                <span className="dash-stat-label">{t('activeMedicinesCount')}</span>
               </div>
             </div>
             <div className="dash-stat-card">
               <span className="dash-stat-icon">🔄</span>
               <div>
                 <span className="dash-stat-number">{medicines.reduce((a, m) => a + m.refillsLeft, 0)}</span>
-                <span className="dash-stat-label">Refills Left</span>
+                <span className="dash-stat-label">{t('refillsLeftCount')}</span>
               </div>
             </div>
           </div>
 
           {/* Simulated Email Reminders Dispatch Log */}
           <div className="glass-card email-logs-card" style={{ marginTop: '1.25rem' }}>
-            <span className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}><Bell size={14} /> Simulated Email Dispatch Logs</span>
+            <span className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}><Bell size={14} /> {t('emailDispatchLogs')}</span>
             {emailLogs.length === 0 ? (
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0.5rem 0', textAlign: 'left' }}>No email logs retrieved from MongoDB yet today.</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0.5rem 0', textAlign: 'left' }}>{t('noEmailLogs')}</p>
             ) : (
               <div className="email-logs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', textAlign: 'left' }}>
                 {emailLogs.slice(0, 3).map((log) => (
                   <div key={log.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.6rem 0.85rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>To: {log.recipient}</span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>{t('toLabel')}: {log.recipient}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                     <span style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginTop: '0.15rem' }}>{log.subject}</span>
                     <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.body}</p>
@@ -285,17 +287,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
         <div className="dash-col-right">
           <div className="checklist-section">
             <div className="flex-title-row" style={{ marginBottom: '0.75rem' }}>
-              <h2>Today's Medications</h2>
+              <h2>{t('todaysMeds')}</h2>
               <button className="btn btn-secondary btn-xs" onClick={() => setCurrentTab('tracker')}>
-                <CalendarDays size={14} /> History
+                <CalendarDays size={14} /> {t('history')}
               </button>
             </div>
 
             {totalDosesCount === 0 ? (
               <div className="empty-schedule">
-                <p>No medicines scheduled. Scan a prescription to get started.</p>
+                <p>{t('noMedsScheduled')}</p>
                 <button className="btn btn-primary" onClick={() => setCurrentTab('scanner')}>
-                  <UploadCloud size={16} /> Scan Prescription
+                  <UploadCloud size={16} /> {t('scanPrescription')}
                 </button>
               </div>
             ) : (

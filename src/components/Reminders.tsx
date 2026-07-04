@@ -25,7 +25,9 @@ export const Reminders: React.FC = () => {
     slotTimes,
     updateSlotTime,
     emailLogs,
-    fetchEmailLogs
+    fetchEmailLogs,
+    language,
+    t
   } = useMed();
 
   const [contactName, setContactName] = useState(emergencyContact.name);
@@ -91,8 +93,8 @@ export const Reminders: React.FC = () => {
   return (
     <div className="reminders-view animate-fade-in">
       <header className="view-header">
-        <h1>Reminders & Emergency SOS Settings</h1>
-        <p>Set notification times, configure emergency responders, and trigger push reminder test alerts.</p>
+        <h1>{t('remindersHeader')}</h1>
+        <p>{t('remindersSub')}</p>
       </header>
 
       {/* SOS Active flashing banner */}
@@ -100,8 +102,8 @@ export const Reminders: React.FC = () => {
         <div className="sos-siren-banner animate-fade-in">
           <div className="siren-content">
             <ShieldAlert size={48} className="siren-icon-spin" />
-            <h2>EMERGENCY SOS ACTIVE</h2>
-            <p>A simulated emergency text message containing your current location coordinates was sent to your contact:</p>
+            <h2>{t('emergencySosActive')}</h2>
+            <p>{t('emergencySosActiveSub')}</p>
             
             <div className="sos-contact-box">
               <h3>{emergencyContact.name}</h3>
@@ -109,12 +111,12 @@ export const Reminders: React.FC = () => {
             </div>
 
             <div className="sos-log-details">
-              <span>GPS Coordinates Transmitted:</span>
+              <span>{t('gpsTransmitted')}:</span>
               <code>Latitude: 37.7749° N, Longitude: 122.4194° W</code>
             </div>
 
             <button className="btn btn-secondary btn-cancel-sos" onClick={resetSOS}>
-              Cancel SOS Warning
+              {t('cancelSosWarning')}
             </button>
           </div>
         </div>
@@ -126,7 +128,7 @@ export const Reminders: React.FC = () => {
         <div className="glass-card reminders-preferences-card">
           <div className="card-section-title">
             <Bell size={18} className="title-icon" />
-            <h3>Notification Preferences</h3>
+            <h3>{t('notificationPrefs')}</h3>
           </div>
 
           <div className="preference-settings">
@@ -136,8 +138,8 @@ export const Reminders: React.FC = () => {
               <div className="setting-label-block">
                 <div className="icon-badge"><Smartphone size={16} /></div>
                 <div>
-                  <h4>Browser Push Reminders</h4>
-                  <p>Trigger instant audio alerts on medication schedules</p>
+                  <h4>{t('pushReminders')}</h4>
+                  <p>{t('pushRemindersSub')}</p>
                 </div>
               </div>
               <label className="switch">
@@ -155,8 +157,8 @@ export const Reminders: React.FC = () => {
               <div className="setting-label-block">
                 <div className="icon-badge"><Mail size={16} /></div>
                 <div>
-                  <h4>Email Alerts</h4>
-                  <p>Send summary reports and missed compliance notices</p>
+                  <h4>{t('emailAlerts')}</h4>
+                  <p>{t('emailAlertsSub')}</p>
                 </div>
               </div>
               <label className="switch">
@@ -172,50 +174,58 @@ export const Reminders: React.FC = () => {
 
           {/* Schedule Timings setup */}
           <div className="schedule-timings-config">
-            <h4>Scheduled Timing Slots</h4>
-            <p className="section-desc">Change the specific hours you receive medication notifications.</p>
+            <h4>{t('scheduledSlots')}</h4>
+            <p className="section-desc">{t('scheduledSlotsSub')}</p>
 
             <div className="time-slots-inputs">
-              {Object.keys(slotTimes).map((slot) => (
-                <div key={slot} className="time-slot-input-row">
-                  <span className="slot-name">{slot.toUpperCase()}</span>
-                  <input 
-                    type="time" 
-                    className="input-field time-picker" 
-                    value={slotTimes[slot as keyof typeof slotTimes]} 
-                    onChange={(e) => handleTimeChange(slot as keyof typeof slotTimes, e.target.value)}
-                  />
-                </div>
-              ))}
+              {Object.keys(slotTimes).map((slot) => {
+                const slotLabels: Record<string, string> = {
+                  morning: language === 'bn' ? 'সকাল' : 'MORNING',
+                  afternoon: language === 'bn' ? 'দুপুর' : 'AFTERNOON',
+                  evening: language === 'bn' ? 'সন্ধ্যা' : 'EVENING',
+                  night: language === 'bn' ? 'রাত' : 'NIGHT'
+                };
+                return (
+                  <div key={slot} className="time-slot-input-row">
+                    <span className="slot-name">{slotLabels[slot] || slot.toUpperCase()}</span>
+                    <input 
+                      type="time" 
+                      className="input-field time-picker" 
+                      value={slotTimes[slot as keyof typeof slotTimes]} 
+                      onChange={(e) => handleTimeChange(slot as keyof typeof slotTimes, e.target.value)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* Test Reminder Alerts actions */}
           <div className="testing-actions">
-            <h4>Simulate Reminders</h4>
+            <h4>{t('simulateReminders')}</h4>
             <div className="test-buttons-row">
               <button className="btn btn-secondary flex-btn" onClick={() => sendPushTest("MedDNA Daily Reminder", "It's time to take Lisinopril 10mg (before bed).")}>
-                <Play size={12} /> Test Push
+                <Play size={12} /> {t('testPush')}
               </button>
               <button className="btn btn-secondary flex-btn" onClick={testEmailNotification}>
-                <Play size={12} /> Test Email
+                <Play size={12} /> {t('testEmail')}
               </button>
             </div>
           </div>
 
           {/* Email Logs Section */}
           <div className="email-logs-list-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            <h4>Simulated Email Dispatch Logs</h4>
-            <p className="section-desc" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Logs of emails saved to MongoDB when reminders fire or SOS is triggered.</p>
+            <h4>{t('emailDispatchLogs')}</h4>
+            <p className="section-desc" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{t('emailDispatchLogsSub')}</p>
             {emailLogs.length === 0 ? (
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>No emails sent yet.</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>{t('noEmailsSentYet')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                 {emailLogs.map((log) => (
                   <div key={log.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
-                      <span style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>To: {log.recipient}</span>
-                      <span style={{ color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString()}</span>
+                      <span style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>{t('toLabel')}: {log.recipient}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString(language === 'bn' ? 'bn-BD' : 'en-US')}</span>
                     </div>
                     <span style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', margin: '0.15rem 0' }}>{log.subject}</span>
                     <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{log.body}</p>
@@ -230,14 +240,14 @@ export const Reminders: React.FC = () => {
         <div className="glass-card emergency-setup-card">
           <div className="card-section-title">
             <ShieldAlert size={18} className="title-icon danger" />
-            <h3>Emergency Responder SOS</h3>
+            <h3>{t('emergencyResponderSOS')}</h3>
           </div>
 
-          <p className="card-desc">Configure a relative or guardian. In case of emergency or severe interaction, clicking the SOS button immediately alerts them with coordinates.</p>
+          <p className="card-desc">{t('emergencyResponderSOSSub')}</p>
 
           <form className="emergency-form" onSubmit={handleSaveContact}>
             <div className="input-group">
-              <label>Contact Name / Relation</label>
+              <label>{t('contactNameRelation')}</label>
               <input 
                 type="text" 
                 className="input-field" 
@@ -248,7 +258,7 @@ export const Reminders: React.FC = () => {
             </div>
 
             <div className="input-group">
-              <label>Contact Phone Number</label>
+              <label>{t('contactPhone')}</label>
               <input 
                 type="tel" 
                 className="input-field" 
@@ -259,18 +269,18 @@ export const Reminders: React.FC = () => {
             </div>
 
             <button type="submit" className="btn btn-secondary save-contact-btn">
-              <Save size={14} /> {saveSuccess ? "Saved Successfully!" : "Save Responder Info"}
+              <Save size={14} /> {saveSuccess ? (language === 'bn' ? 'সফলভাবে সংরক্ষিত!' : "Saved Successfully!") : t('saveResponderInfo')}
             </button>
           </form>
 
           {/* Big Panic Button */}
           <div className="panic-button-wrapper">
-            <h4>Trigger Panic SOS</h4>
-            <p className="section-desc">Instantly triggers audible alarm logs, alerts the designated responder, and contacts emergency medical services.</p>
+            <h4>{t('triggerPanicSOS')}</h4>
+            <p className="section-desc">{t('triggerPanicSOSSub')}</p>
             
             <button className="panic-panic-btn" onClick={startCountdown}>
               <ShieldAlert size={36} />
-              <span>ACTIVATE SOS</span>
+              <span>{t('activateSOS')}</span>
             </button>
           </div>
         </div>
@@ -286,9 +296,11 @@ export const Reminders: React.FC = () => {
                 {countdownTime}
               </div>
               <div style={{ marginTop: '0.5rem' }}>
-                <h3 style={{ color: 'var(--color-danger)', fontWeight: 800, fontSize: '1.4rem' }}>SOS CONNECTING</h3>
+                <h3 style={{ color: 'var(--color-danger)', fontWeight: 800, fontSize: '1.4rem' }}>{language === 'bn' ? 'জরুরী যোগাযোগ করা হচ্ছে' : 'SOS CONNECTING'}</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: '1.4' }}>
-                  Alerting emergency responders and dispatching location coordinates in {countdownTime} seconds.
+                  {language === 'bn'
+                    ? `${countdownTime} সেকেন্ডের মধ্যে জরুরী যোগাযোগকারীকে সতর্ক করা হবে এবং জিপিএস কোঅর্ডিনেট পাঠানো হবে।`
+                    : `Alerting emergency responders and dispatching location coordinates in ${countdownTime} seconds.`}
                 </p>
               </div>
               <button 
@@ -296,7 +308,7 @@ export const Reminders: React.FC = () => {
                 onClick={cancelCountdown}
                 style={{ background: '#374151', color: 'white', width: '100%', marginTop: '1rem', padding: '0.75rem' }}
               >
-                CANCEL TRIGGER
+                {language === 'bn' ? 'অনুরোধ বাতিল করুন' : 'CANCEL TRIGGER'}
               </button>
             </div>
           </div>
