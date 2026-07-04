@@ -1,79 +1,103 @@
 import React, { useState, useEffect } from 'react';
 import { useMed } from '../context/MedContext';
-import { SAMPLE_PRESCRIPTIONS, type ExtractedMedicine } from '../services/mockData';
-import { 
-  UploadCloud, 
-  FileText, 
-  Sparkles, 
-  Check, 
-  X, 
-  Plus, 
+import {
+  SAMPLE_PRESCRIPTIONS,
+  type ExtractedMedicine,
+} from '../services/mockData';
+import {
+  UploadCloud,
+  FileText,
+  Sparkles,
+  Check,
+  X,
+  Plus,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  RotateCcw,
+  Stethoscope,
+  CalendarDays,
+  Sunrise,
+  Sun,
+  Moon,
+  Utensils,
 } from 'lucide-react';
 
+const SCHEDULE_OPTIONS: {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+}[] = [
+  { key: 'morning', label: 'Morning', icon: Sunrise },
+  { key: 'noon', label: 'Noon', icon: Sun },
+  { key: 'night', label: 'Night', icon: Moon },
+];
 
+const MEAL_OPTIONS = ['Before meal', 'After meal'];
 
 export const Scanner: React.FC = () => {
-  const { 
-    startScanning, 
+  const {
+    startScanning,
     cancelScanning,
-    isScanning, 
-    scanResult, 
+    isScanning,
+    scanResult,
     scanError,
     setScanError,
     saveScannedMeds,
-    medicines 
+    medicines,
   } = useMed();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string>('');
-  
+
   // Real-time terminal simulator logs
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const consoleEndRef = React.useRef<HTMLDivElement>(null);
 
   // Edited list of medicines from scan (with selection status)
-  const [editedMeds, setEditedMeds] = useState<(Omit<ExtractedMedicine, 'id' | 'startDate'> & { selected: boolean })[]>([]);
+  const [editedMeds, setEditedMeds] = useState<
+    (Omit<ExtractedMedicine, 'id' | 'startDate'> & { selected: boolean })[]
+  >([]);
 
-  // Update editor state when scan results arrive
+  // Update editor state whenever fresh scan results arrive from the backend
   useEffect(() => {
     if (scanResult) {
-      const meds = scanResult.extractedMeds.map(m => ({
+      const meds = (scanResult.extractedMeds || []).map((m) => ({
         name: m.name,
         dosage: m.dosage,
         timing: [...m.timing],
         instructions: m.instructions,
         duration: m.duration,
         refillsLeft: m.refillsLeft,
-        selected: true
+        cause: m.cause || '',
+        selected: true,
       }));
       setEditedMeds(meds);
     }
   }, [scanResult]);
 
-  // Terminal logging typist simulator
+  // Terminal logging typist simulator — mirrors the real pipeline stages
+  // (OCR call -> LLM parse -> persistence) so the wait feels transparent.
   useEffect(() => {
     if (isScanning) {
       setConsoleLogs([]);
       const logs = [
-        "[0.00s] INITIALIZING: Connecting to MedDNA API service...",
-        "[0.30s] PREPARATION: Preparing image payload vectors...",
-        "[0.65s] UPLOAD: Sending image payload to Express server...",
-        "[1.10s] RUNNING OCR: Submitting image buffer to NVIDIA Nemotron-OCR-v2 NIM...",
-        "[2.15s] OCR ANALYSIS: Reading text shapes and characters (Confidence rating: 98.4%)...",
-        "[3.25s] RUNNING LLM: Submitting extracted text blocks to NVIDIA Llama-3.1-8b-Instruct...",
-        "[4.50s] LLM EXTRACTING: Parsing doctor signature, specialty, and medications...",
-        "[5.80s] COMPILING: Structuring clinical guidelines and timings...",
-        "[6.90s] MONGODB LOGGING: Committing prescription scan history to databases...",
-        "[7.80s] COMPLETE: Prescription scanned and parsed successfully!"
+        '[0.00s] INITIALIZING: Connecting to MedDNA API service...',
+        '[0.30s] PREPARATION: Preparing image payload vectors...',
+        '[0.65s] UPLOAD: Sending image payload to Express server...',
+        '[1.10s] RUNNING OCR: Submitting image buffer to NVIDIA Nemotron-OCR-v2 NIM...',
+        '[2.15s] OCR ANALYSIS: Reading text shapes and characters...',
+        '[3.25s] RUNNING LLM: Submitting extracted text blocks to NVIDIA Llama-3.1-8b-Instruct...',
+        '[4.50s] LLM EXTRACTING: Parsing doctor signature, specialty, and medications...',
+        '[5.80s] COMPILING: Structuring clinical guidelines and timings...',
+        '[6.90s] LOGGING: Committing prescription scan history...',
+        '[7.80s] COMPLETE: Prescription scanned and parsed successfully!',
       ];
-      
+
       let curIdx = 0;
       const interval = setInterval(() => {
         if (curIdx < logs.length) {
-          const nextLog = logs[curIdx];
-          setConsoleLogs(prev => [...prev, nextLog]);
+          setConsoleLogs((prev) => [...prev, logs[curIdx]]);
           curIdx++;
         } else {
           clearInterval(interval);
@@ -92,8 +116,9 @@ export const Scanner: React.FC = () => {
   }, [consoleLogs]);
 
   const handleSelectSample = (id: string) => {
+    setScanError?.(null);
     setSelectedSampleId(id);
-    const sample = SAMPLE_PRESCRIPTIONS.find(s => s.id === id);
+    const sample = SAMPLE_PRESCRIPTIONS.find((s) => s.id === id);
     if (sample) {
       setSelectedFile(sample.imageUrl);
     }
@@ -102,6 +127,7 @@ export const Scanner: React.FC = () => {
   const handleCustomFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setScanError?.(null);
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -114,6 +140,7 @@ export const Scanner: React.FC = () => {
   };
 
   const handleStartScan = () => {
+    setScanError?.(null);
     if (selectedSampleId === 'custom' && selectedFile) {
       startScanning(selectedFile);
     } else if (!selectedSampleId) {
@@ -125,7 +152,7 @@ export const Scanner: React.FC = () => {
   };
 
   const handleAddField = () => {
-    setEditedMeds(prev => [
+    setEditedMeds((prev) => [
       ...prev,
       {
         name: 'New Medicine',
@@ -134,38 +161,85 @@ export const Scanner: React.FC = () => {
         instructions: 'Take with water',
         duration: '7 days',
         refillsLeft: 0,
-        selected: true
-      }
+        cause: '',
+        selected: true,
+      },
     ]);
   };
 
   const handleRemoveField = (index: number) => {
-    setEditedMeds(prev => prev.filter((_, idx) => idx !== index));
+    setEditedMeds((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleUpdateMed = (index: number, key: string, value: any) => {
-    setEditedMeds(prev => {
+    setEditedMeds((prev) => {
       const copy = [...prev];
       copy[index] = {
         ...copy[index],
-        [key]: value
+        [key]: value,
       };
       return copy;
     });
   };
 
+  const normalizeTiming = (timing: string): string[] => {
+    const value = timing.toLowerCase().trim().replace(/\s+/g, '');
+
+    switch (value) {
+      case '1-0-0':
+      case '100':
+      case 'od':
+        return ['morning'];
+
+      case '0-1-0':
+      case '010':
+        return ['noon'];
+
+      case '0-0-1':
+      case '001':
+      case 'hs':
+        return ['night'];
+
+      case '1-0-1':
+      case '101':
+      case 'bd':
+      case 'bid':
+        return ['morning', 'night'];
+
+      case '1-1-1':
+      case '111':
+      case 'tds':
+      case 'tid':
+        return ['morning', 'noon', 'night'];
+
+      case '1-1-0':
+      case '110':
+        return ['morning', 'noon'];
+
+      case '0-1-1':
+      case '011':
+        return ['noon', 'night'];
+
+      default:
+        return [timing];
+    }
+  };
+
   const handleToggleTiming = (index: number, time: string) => {
-    const currentTimings = [...editedMeds[index].timing];
-    const timeIdx = currentTimings.indexOf(time);
-    
-    if (timeIdx > -1) {
+    let currentTimings = editedMeds[index].timing.flatMap((t) =>
+      normalizeTiming(t),
+    );
+
+    currentTimings = [...new Set(currentTimings)];
+
+    if (currentTimings.includes(time)) {
       if (currentTimings.length > 1) {
-        currentTimings.splice(timeIdx, 1);
+        currentTimings = currentTimings.filter((t) => t !== time);
       }
     } else {
       currentTimings.push(time);
     }
-    
+
     handleUpdateMed(index, 'timing', currentTimings);
   };
 
@@ -173,6 +247,7 @@ export const Scanner: React.FC = () => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) {
+      setScanError?.(null);
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
@@ -185,10 +260,15 @@ export const Scanner: React.FC = () => {
   };
 
   const handleSave = () => {
-    const medsToImport = editedMeds.filter(m => m.selected);
+    const medsToImport = editedMeds.filter((m) => m.selected);
     if (medsToImport.length === 0) return;
-    // Map to remove selection status before importing
     saveScannedMeds(medsToImport.map(({ selected, ...rest }) => rest));
+    setSelectedFile(null);
+    setSelectedSampleId('');
+  };
+
+  const handleRetry = () => {
+    setScanError?.(null);
     setSelectedFile(null);
     setSelectedSampleId('');
   };
@@ -196,57 +276,117 @@ export const Scanner: React.FC = () => {
   // Check if a medicine already exists in dashboard safely
   const isDuplicate = (name?: string) => {
     if (!name) return false;
-    return medicines.some(m => m.name && m.name.toLowerCase().trim() === name.toLowerCase().trim());
+    return medicines.some(
+      (m) =>
+        m.name && m.name.toLowerCase().trim() === name.toLowerCase().trim(),
+    );
   };
 
   const toggleMedSelection = (idx: number) => {
     handleUpdateMed(idx, 'selected', !editedMeds[idx].selected);
   };
 
-  const selectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: true })));
-  const deselectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: false })));
+  const selectAllMeds = () =>
+    setEditedMeds((prev) => prev.map((m) => ({ ...m, selected: true })));
+  const deselectAllMeds = () =>
+    setEditedMeds((prev) => prev.map((m) => ({ ...m, selected: false })));
 
-  const sampleDoc = SAMPLE_PRESCRIPTIONS.find(s => s.id === selectedSampleId) || SAMPLE_PRESCRIPTIONS[0];
+  const sampleDoc =
+    SAMPLE_PRESCRIPTIONS.find((s) => s.id === selectedSampleId) ||
+    SAMPLE_PRESCRIPTIONS[0];
   const handwritingLines = sampleDoc.rawHandwriting.split('\n');
 
   return (
     <div className="scanner-view animate-fade-in">
-      
       {/* 1. Upload & Choice Screen */}
       {!isScanning && !scanResult && (
         <div className="upload-container">
           <header className="view-header">
             <h1>Prescription OCR & AI Interpreter</h1>
-            <p>Upload a photo, PDF, or choose from our handwriting demo scripts to test the AI extractor.</p>
+            <p>
+              Upload a photo, PDF, or choose from our handwriting demo scripts
+              to test the AI extractor.
+            </p>
           </header>
 
           {scanError && (
-            <div className="glass-card animate-fade-in" style={{ display: 'flex', gap: '0.75rem', padding: '1rem', border: '1px solid rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.05)', color: 'var(--color-danger)', marginBottom: '1.5rem', borderRadius: 'var(--radius-sm)', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <AlertCircle size={20} />
-                <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{scanError}</span>
+            <div
+              className="glass-card"
+              style={{
+                padding: '1rem 1.1rem',
+                marginBottom: '1.25rem',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                background: 'rgba(239, 68, 68, 0.05)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem',
+              }}
+            >
+              <AlertTriangle
+                size={18}
+                style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }}
+              />
+              <div style={{ flex: 1 }}>
+                <h3
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    margin: 0,
+                    marginBottom: '0.25rem',
+                    color: '#b91c1c',
+                  }}
+                >
+                  Scan failed
+                </h3>
+                <p
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'var(--text-secondary)',
+                    margin: 0,
+                  }}
+                >
+                  {typeof scanError === 'string'
+                    ? scanError
+                    : 'The prescription could not be processed. Please try a clearer image or a different file.'}
+                </p>
               </div>
-              <button 
-                onClick={() => setScanError(null)} 
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              <button
+                className="btn btn-secondary btn-xs"
+                onClick={handleRetry}
+                style={{
+                  fontSize: '0.7rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  flexShrink: 0,
+                }}
               >
-                <X size={16} />
+                <RotateCcw size={12} /> Retry
               </button>
             </div>
           )}
 
           <div className="scanner-split-layout">
-            
             {/* Drag & Drop Area */}
-            <div 
+            <div
               className={`dropzone glass-card ${selectedFile ? 'has-file' : ''}`}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleFileDrop}
             >
               {selectedFile ? (
                 <div className="preview-file-wrapper">
-                  <img src={selectedFile} alt="Selected Prescription" className="preview-presc-img" />
-                  <button className="remove-file-btn" onClick={() => { setSelectedFile(null); setSelectedSampleId(''); }}>
+                  <img
+                    src={selectedFile}
+                    alt="Selected Prescription"
+                    className="preview-presc-img"
+                  />
+                  <button
+                    className="remove-file-btn"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setSelectedSampleId('');
+                    }}
+                  >
                     <X size={16} />
                   </button>
                   <div className="file-info-overlay">
@@ -260,14 +400,16 @@ export const Scanner: React.FC = () => {
                     <UploadCloud size={32} />
                   </div>
                   <h3>Drag & Drop Prescription</h3>
-                  <p className="dropzone-subtitle">Supports JPG, PNG, PDF or camera snaps</p>
+                  <p className="dropzone-subtitle">
+                    Supports JPG, PNG, PDF or camera snaps
+                  </p>
                   <label className="btn btn-secondary upload-input-btn">
                     Browse Files
-                    <input 
-                      type="file" 
-                      accept="image/*" 
+                    <input
+                      type="file"
+                      accept="image/*"
                       style={{ display: 'none' }}
-                      onChange={handleCustomFileChange} 
+                      onChange={handleCustomFileChange}
                     />
                   </label>
                 </div>
@@ -277,18 +419,24 @@ export const Scanner: React.FC = () => {
             {/* Preloaded Demo Prescriptions */}
             <div className="demo-select-panel">
               <h3>Try Sample Prescriptions (Handwritten OCR Demo)</h3>
-              <p className="section-desc">Click a card to load pre-scanned mock handwriting samples.</p>
-              
+              <p className="section-desc">
+                Click a card to load pre-scanned mock handwriting samples.
+              </p>
+
               <div className="sample-cards-grid">
-                {SAMPLE_PRESCRIPTIONS.map(sample => (
-                  <div 
+                {SAMPLE_PRESCRIPTIONS.map((sample) => (
+                  <div
                     key={sample.id}
                     className={`sample-select-card glass-card interactive ${selectedSampleId === sample.id ? 'selected' : ''}`}
                     onClick={() => handleSelectSample(sample.id)}
                   >
                     <div className="sample-card-head">
-                      <span className="sample-doctor">{sample.doctorName.split(',')[0]}</span>
-                      <span className="badge badge-info">{sample.specialty.split(' ')[0]}</span>
+                      <span className="sample-doctor">
+                        {sample.doctorName.split(',')[0]}
+                      </span>
+                      <span className="badge badge-info">
+                        {sample.specialty.split(' ')[0]}
+                      </span>
                     </div>
                     <div className="sample-card-preview-text">
                       <p>"{sample.rawHandwriting.split('\n')[2]}"</p>
@@ -302,7 +450,7 @@ export const Scanner: React.FC = () => {
                 ))}
               </div>
 
-              <button 
+              <button
                 className="btn btn-primary start-scan-action-btn"
                 onClick={handleStartScan}
                 disabled={!selectedFile && !selectedSampleId}
@@ -310,19 +458,27 @@ export const Scanner: React.FC = () => {
                 <Sparkles size={16} /> Parse prescription with MedDNA AI
               </button>
             </div>
-
           </div>
         </div>
       )}
 
       {/* 2. Scanning / Loading Screen (Command Line Logging terminal style) */}
       {isScanning && (
-        <div className="scanning-screen-wrapper glass-card" style={{ maxWidth: '950px' }}>
+        <div
+          className="scanning-screen-wrapper glass-card"
+          style={{ maxWidth: '950px' }}
+        >
           <div className="scanner-animation-container">
             {selectedFile ? (
-              <img src={selectedFile} alt="Scanning" className="scanning-preview-img" />
+              <img
+                src={selectedFile}
+                alt="Scanning"
+                className="scanning-preview-img"
+              />
             ) : (
-              <div className="scanning-fallback-box"><FileText size={48} /></div>
+              <div className="scanning-fallback-box">
+                <FileText size={48} />
+              </div>
             )}
             <div className="scanner-laser-line" />
             <div className="scanner-scanning-overlay" />
@@ -332,13 +488,21 @@ export const Scanner: React.FC = () => {
             <div className="glass-card ocr-console-card">
               <div className="console-header">
                 <div className="console-green-dot" />
-                <span className="console-title">MedDNA-OCR-ENGINE://terminal_logs</span>
+                <span className="console-title">
+                  MedDNA-OCR-ENGINE://terminal_logs
+                </span>
               </div>
               <div className="console-output-area">
                 {consoleLogs.filter(Boolean).map((log, idx) => {
-                  const isHighlight = log.includes("COMPLETE") || log.includes("ACCURACY") || log.includes("accuracy");
+                  const isHighlight =
+                    log.includes('COMPLETE') ||
+                    log.includes('ACCURACY') ||
+                    log.includes('accuracy');
                   return (
-                    <div key={idx} className={`console-log-line ${isHighlight ? 'highlight' : ''}`}>
+                    <div
+                      key={idx}
+                      className={`console-log-line ${isHighlight ? 'highlight' : ''}`}
+                    >
                       {log}
                     </div>
                   );
@@ -346,8 +510,12 @@ export const Scanner: React.FC = () => {
                 <div ref={consoleEndRef} />
               </div>
             </div>
-            
-            <button className="btn btn-secondary btn-cancel-scan" onClick={cancelScanning} style={{ alignSelf: 'flex-end' }}>
+
+            <button
+              className="btn btn-secondary btn-cancel-scan"
+              onClick={cancelScanning}
+              style={{ alignSelf: 'flex-end' }}
+            >
               Cancel Scan
             </button>
           </div>
@@ -360,37 +528,174 @@ export const Scanner: React.FC = () => {
           <header className="view-header">
             <div className="flex-title-row">
               <h1>Scan Results</h1>
-              <span className="badge badge-success"><Sparkles size={12} /> AI Extraction Complete</span>
+              <span className="badge badge-success">
+                <Sparkles size={12} /> AI Extraction Complete
+              </span>
             </div>
             <p>
-              Found <strong>{editedMeds.length}</strong> medicine{editedMeds.length !== 1 ? 's' : ''} in this prescription. 
-              Select which ones to import into your dashboard.
+              Found <strong>{editedMeds.length}</strong> medicine
+              {editedMeds.length !== 1 ? 's' : ''} in this prescription. Select
+              which ones to import into your dashboard.
             </p>
           </header>
 
+          {/* Doctor summary strip — driven entirely by backend-parsed fields */}
+          <div
+            className="glass-card"
+            style={{
+              padding: '1rem 1.25rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '1.5rem',
+              alignItems: 'center',
+              borderLeft: '3px solid var(--color-primary)',
+            }}
+          >
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Stethoscope
+                size={16}
+                style={{ color: 'var(--color-primary)' }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.68rem',
+                    color: 'var(--text-muted)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  Doctor
+                </div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                  {scanResult.doctorName || 'Unknown'}
+                </div>
+              </div>
+            </div>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <FileText size={16} style={{ color: 'var(--color-primary)' }} />
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.68rem',
+                    color: 'var(--text-muted)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  Specialty
+                </div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                  {scanResult.specialty || 'Unknown'}
+                </div>
+              </div>
+            </div>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <CalendarDays
+                size={16}
+                style={{ color: 'var(--color-primary)' }}
+              />
+              <div>
+                <div
+                  style={{
+                    fontSize: '0.68rem',
+                    color: 'var(--text-muted)',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  Date
+                </div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                  {scanResult.date || '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Top: Image preview + OCR text side by side */}
-          <div style={{ display: 'grid', gridTemplateColumns: selectedFile || selectedSampleId === 'custom' ? '1fr 1fr' : '1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                selectedFile || selectedSampleId === 'custom'
+                  ? '1fr 1fr'
+                  : '1fr',
+              gap: '1.25rem',
+              marginBottom: '1.5rem',
+            }}
+          >
             {/* Image preview */}
             {(selectedFile || selectedSampleId !== 'custom') && (
               <div className="glass-card" style={{ padding: '1rem' }}>
-                <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <h3
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    marginBottom: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
                   <FileText size={14} /> Uploaded Document
                 </h3>
                 {selectedSampleId === 'custom' && selectedFile ? (
-                  <div style={{ background: '#f5f5f5', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={selectedFile} alt="Uploaded prescription" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  <div
+                    style={{
+                      background: '#f5f5f5',
+                      borderRadius: 'var(--radius-sm)',
+                      overflow: 'hidden',
+                      border: '1px solid var(--border-color)',
+                      height: '220px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={selectedFile}
+                      alt="Uploaded prescription"
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                      }}
+                    />
                   </div>
                 ) : (
-                  <div className="clinical-presc-slip" style={{ transform: 'scale(0.85)', transformOrigin: 'top left' }}>
+                  <div
+                    className="clinical-presc-slip"
+                    style={{
+                      transform: 'scale(0.85)',
+                      transformOrigin: 'top left',
+                    }}
+                  >
                     <div className="slip-header">
-                      <div className="slip-header-title">{scanResult.doctorName}</div>
-                      <div className="slip-header-sub">{scanResult.specialty}</div>
+                      <div className="slip-header-title">
+                        {scanResult.doctorName}
+                      </div>
+                      <div className="slip-header-sub">
+                        {scanResult.specialty}
+                      </div>
                     </div>
                     <div className="slip-body" style={{ minHeight: '120px' }}>
                       <div className="rx-symbol">Rx</div>
                       <div className="handwritten-content">
                         {handwritingLines.slice(2, 6).map((line, idx) => (
-                          <div key={idx} className="handwritten-line">{line}</div>
+                          <div key={idx} className="handwritten-line">
+                            {line}
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -398,124 +703,419 @@ export const Scanner: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {/* OCR extracted text */}
             <div className="glass-card" style={{ padding: '1rem' }}>
-              <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem' }}>📝 Extracted OCR Text</h3>
-              <div style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', maxHeight: '220px', overflowY: 'auto' }}>
-                <pre style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5 }}>
+              <h3
+                style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  marginBottom: '0.75rem',
+                }}
+              >
+                📝 Extracted OCR Text
+              </h3>
+              <div
+                style={{
+                  background: 'rgba(0,0,0,0.02)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.75rem',
+                  maxHeight: '220px',
+                  overflowY: 'auto',
+                }}
+              >
+                <pre
+                  style={{
+                    fontSize: '0.72rem',
+                    color: 'var(--text-secondary)',
+                    fontFamily: 'monospace',
+                    whiteSpace: 'pre-wrap',
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}
+                >
                   {scanResult.rawText || '(No raw text extracted)'}
                 </pre>
               </div>
-              <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Doctor: <strong>{scanResult.doctorName}</strong> • Specialty: {scanResult.specialty} • Date: {scanResult.date}
+              <div
+                style={{
+                  marginTop: '0.5rem',
+                  fontSize: '0.7rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Doctor: <strong>{scanResult.doctorName}</strong> • Specialty:{' '}
+                {scanResult.specialty} • Date: {scanResult.date}
               </div>
             </div>
           </div>
 
           {/* Medicine List with checkboxes */}
           <div className="glass-card" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
-                💊 Extracted Medicines ({editedMeds.length})
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '1rem',
+                borderBottom: '1px solid var(--border-color)',
+                paddingBottom: '0.75rem',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    background: 'var(--color-primary-glow)',
+                    fontSize: '0.95rem',
+                  }}
+                >
+                  💊
+                </span>
+                Extracted Medicines ({editedMeds.length})
               </h3>
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button className="btn btn-secondary btn-xs" onClick={selectAllMeds} style={{ fontSize: '0.7rem' }}>Select All</button>
-                <button className="btn btn-secondary btn-xs" onClick={deselectAllMeds} style={{ fontSize: '0.7rem' }}>Deselect All</button>
-                <button className="btn btn-secondary btn-xs" onClick={handleAddField} style={{ fontSize: '0.7rem' }}>
+              <div
+                style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+              >
+                <button
+                  className="btn btn-secondary btn-xs"
+                  onClick={selectAllMeds}
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  Select All
+                </button>
+                <button
+                  className="btn btn-secondary btn-xs"
+                  onClick={deselectAllMeds}
+                  style={{ fontSize: '0.7rem' }}
+                >
+                  Deselect All
+                </button>
+                <button
+                  className="btn btn-secondary btn-xs"
+                  onClick={handleAddField}
+                  style={{ fontSize: '0.7rem' }}
+                >
                   <Plus size={12} /> Add Manual
                 </button>
               </div>
             </div>
 
             {editedMeds.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>No medicines could be extracted from this document.</p>
-                <p style={{ fontSize: '0.8rem' }}>This might not be a prescription. You can add medicines manually using the button above.</p>
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '3rem 1rem',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                  No medicines could be extracted from this document.
+                </p>
+                <p style={{ fontSize: '0.8rem' }}>
+                  This might not be a prescription. You can add medicines
+                  manually using the button above.
+                </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                }}
+              >
                 {editedMeds.map((med, idx) => {
                   const duplicate = isDuplicate(med.name);
                   const isSelected = med.selected;
                   return (
-                    <div 
-                      key={idx} 
-                      style={{ 
-                        border: `1px solid ${duplicate ? 'rgba(234, 179, 8, 0.4)' : isSelected ? 'rgba(6, 182, 212, 0.3)' : 'var(--border-color)'}`,
-                        borderRadius: 'var(--radius-sm)', 
-                        padding: '1rem',
-                        background: duplicate ? 'rgba(234, 179, 8, 0.03)' : isSelected ? 'rgba(6, 182, 212, 0.02)' : 'transparent',
-                        transition: 'all 0.2s ease'
+                    <div
+                      key={idx}
+                      style={{
+                        border: `1px solid ${duplicate ? 'rgba(234, 179, 8, 0.4)' : isSelected ? 'var(--color-primary)' : 'var(--border-color)'}`,
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '1.1rem',
+                        background: duplicate
+                          ? 'rgba(234, 179, 8, 0.03)'
+                          : isSelected
+                            ? 'var(--color-primary-glow)'
+                            : 'transparent',
+                        boxShadow: isSelected
+                          ? '0 4px 16px rgba(0,0,0,0.06)'
+                          : 'none',
+                        transition: 'all 0.2s ease',
                       }}
                     >
                       {/* Top row: checkbox + name + badges + delete */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                        <input 
-                          type="checkbox" 
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          marginBottom: '0.75rem',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleMedSelection(idx)}
-                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            cursor: 'pointer',
+                            accentColor: 'var(--color-primary)',
+                          }}
                         />
                         <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>#{idx + 1} {med.name}</span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-primary-glow)', padding: '0.1rem 0.5rem', borderRadius: '4px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <span
+                              style={{ fontWeight: 700, fontSize: '0.95rem' }}
+                            >
+                              #{idx + 1} {med.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: 'var(--color-primary)',
+                                background: 'var(--color-primary-glow)',
+                                padding: '0.1rem 0.5rem',
+                                borderRadius: '4px',
+                              }}
+                            >
                               {med.dosage}
                             </span>
+                            {med.cause && (
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: 600,
+                                  color: 'var(--text-muted)',
+                                  background: 'rgba(0,0,0,0.03)',
+                                  padding: '0.1rem 0.5rem',
+                                  borderRadius: '4px',
+                                }}
+                              >
+                                {med.cause}
+                              </span>
+                            )}
                             {duplicate && (
-                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', background: 'rgba(234, 179, 8, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <AlertCircle size={10} /> DUPLICATE — Already in Dashboard
+                              <span
+                                style={{
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  color: '#b45309',
+                                  background: 'rgba(234, 179, 8, 0.15)',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem',
+                                }}
+                              >
+                                <AlertCircle size={10} /> DUPLICATE — Already in
+                                Dashboard
                               </span>
                             )}
                           </div>
                         </div>
-                        <button onClick={() => handleRemoveField(idx)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
+                        <button
+                          onClick={() => handleRemoveField(idx)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '0.25rem',
+                          }}
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>
 
                       {/* Editable fields grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: '0.6rem' }}>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns:
+                            'repeat(auto-fill, minmax(160px, 1fr))',
+                          gap: '0.6rem',
+                          marginBottom: '0.6rem',
+                        }}
+                      >
+                        <div
+                          className="input-group"
+                          style={{ marginBottom: 0 }}
+                        >
                           <label style={{ fontSize: '0.68rem' }}>Name</label>
-                          <input type="text" className="input-field" value={med.name} onChange={(e) => handleUpdateMed(idx, 'name', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={med.name}
+                            onChange={(e) =>
+                              handleUpdateMed(idx, 'name', e.target.value)
+                            }
+                            style={{
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.8rem',
+                            }}
+                          />
                         </div>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
+                        <div
+                          className="input-group"
+                          style={{ marginBottom: 0 }}
+                        >
                           <label style={{ fontSize: '0.68rem' }}>Dosage</label>
-                          <input type="text" className="input-field" value={med.dosage} onChange={(e) => handleUpdateMed(idx, 'dosage', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={med.dosage}
+                            onChange={(e) =>
+                              handleUpdateMed(idx, 'dosage', e.target.value)
+                            }
+                            style={{
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.8rem',
+                            }}
+                          />
                         </div>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: '0.68rem' }}>Duration</label>
-                          <input type="text" className="input-field" value={med.duration} onChange={(e) => handleUpdateMed(idx, 'duration', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                        <div
+                          className="input-group"
+                          style={{ marginBottom: 0 }}
+                        >
+                          <label style={{ fontSize: '0.68rem' }}>
+                            Duration
+                          </label>
+                          <input
+                            type="text"
+                            className="input-field"
+                            value={med.duration}
+                            onChange={(e) =>
+                              handleUpdateMed(idx, 'duration', e.target.value)
+                            }
+                            style={{
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.8rem',
+                            }}
+                          />
                         </div>
-                        <div className="input-group" style={{ marginBottom: 0 }}>
+                        <div
+                          className="input-group"
+                          style={{ marginBottom: 0 }}
+                        >
                           <label style={{ fontSize: '0.68rem' }}>Refills</label>
-                          <input type="number" className="input-field" value={med.refillsLeft} onChange={(e) => handleUpdateMed(idx, 'refillsLeft', parseInt(e.target.value) || 0)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                          <input
+                            type="number"
+                            className="input-field"
+                            value={med.refillsLeft}
+                            onChange={(e) =>
+                              handleUpdateMed(
+                                idx,
+                                'refillsLeft',
+                                parseInt(e.target.value) || 0,
+                              )
+                            }
+                            style={{
+                              padding: '0.35rem 0.5rem',
+                              fontSize: '0.8rem',
+                            }}
+                          />
                         </div>
-                      </div>
-                      
-                      {/* Timing pills */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>Schedule:</span>
-                        {['morning', 'afternoon', 'evening', 'night'].map(time => {
-                          const active = med.timing.includes(time);
-                          return (
-                            <button 
-                              key={time} type="button"
-                              className={`timing-pill ${active ? 'selected' : ''}`}
-                              onClick={() => handleToggleTiming(idx, time)}
-                              style={{ fontSize: '0.65rem', padding: '0.2rem 0.6rem' }}
-                            >
-                              {time.toUpperCase()}
-                            </button>
-                          );
-                        })}
                       </div>
 
-                      {/* Instructions */}
-                      <div style={{ marginTop: '0.5rem' }}>
-                        <input type="text" className="input-field" value={med.instructions} onChange={(e) => handleUpdateMed(idx, 'instructions', e.target.value)} placeholder="Instructions..." style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem', width: '100%' }} />
+                      {/* Timing pills — morning / noon / night, mirroring the
+                          backend's 1-0-1 style dosage-frequency parsing */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          flexWrap: 'wrap',
+                          marginBottom: '0.75rem',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: 'var(--text-muted)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.03em',
+                          }}
+                        >
+                          Schedule
+                        </span>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '0.4rem',
+                            padding: '0.25rem',
+                            background: 'rgba(0,0,0,0.02)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '999px',
+                          }}
+                        >
+                          {SCHEDULE_OPTIONS.map(
+                            ({ key, label, icon: Icon }) => {
+                              const active = med.timing.includes(key);
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => handleToggleTiming(idx, key)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    padding: '0.32rem 0.75rem',
+                                    borderRadius: '999px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.18s ease',
+                                    background: active
+                                      ? 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, var(--color-primary)))'
+                                      : 'transparent',
+                                    color: active
+                                      ? '#fff'
+                                      : 'var(--text-secondary)',
+                                    boxShadow: active
+                                      ? '0 2px 8px var(--color-primary-glow)'
+                                      : 'none',
+                                  }}
+                                >
+                                  <Icon size={12} />
+                                  {label}
+                                </button>
+                              );
+                            },
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -524,21 +1124,51 @@ export const Scanner: React.FC = () => {
             )}
 
             {/* Footer actions */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                <strong>{editedMeds.filter(m => m.selected).length}</strong> of {editedMeds.length} medicine{editedMeds.length !== 1 ? 's' : ''} selected for import
-                {editedMeds.some(m => m.selected && isDuplicate(m.name)) && (
-                  <span style={{ color: '#b45309', marginLeft: '0.75rem', fontWeight: 600 }}>⚠ Includes duplicates</span>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '1.25rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid var(--border-color)',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+              }}
+            >
+              <div
+                style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}
+              >
+                <strong>{editedMeds.filter((m) => m.selected).length}</strong>{' '}
+                of {editedMeds.length} medicine
+                {editedMeds.length !== 1 ? 's' : ''} selected for import
+                {editedMeds.some((m) => m.selected && isDuplicate(m.name)) && (
+                  <span
+                    style={{
+                      color: '#b45309',
+                      marginLeft: '0.75rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ⚠ Includes duplicates
+                  </span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button className="btn btn-secondary" onClick={cancelScanning}>Cancel</button>
-                <button 
-                  className="btn btn-primary" 
+                <button className="btn btn-secondary" onClick={cancelScanning}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
                   onClick={handleSave}
-                  disabled={editedMeds.filter(m => m.selected).length === 0}
+                  disabled={editedMeds.filter((m) => m.selected).length === 0}
                 >
-                  <Check size={16} /> Import {editedMeds.filter(m => m.selected).length} Medicine{editedMeds.filter(m => m.selected).length !== 1 ? 's' : ''} to Dashboard
+                  <Check size={16} /> Import{' '}
+                  {editedMeds.filter((m) => m.selected).length} Medicine
+                  {editedMeds.filter((m) => m.selected).length !== 1
+                    ? 's'
+                    : ''}{' '}
+                  to Dashboard
                 </button>
               </div>
             </div>
