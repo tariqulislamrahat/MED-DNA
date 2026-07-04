@@ -23,7 +23,9 @@ export const Scanner: React.FC = () => {
     scanError,
     setScanError,
     saveScannedMeds,
-    medicines 
+    medicines,
+    language,
+    t
   } = useMed();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -216,8 +218,8 @@ export const Scanner: React.FC = () => {
       {!isScanning && !scanResult && (
         <div className="upload-container">
           <header className="view-header">
-            <h1>Prescription OCR & AI Interpreter</h1>
-            <p>Upload a photo, PDF, or choose from our handwriting demo scripts to test the AI extractor.</p>
+            <h1>{t('ocrHeader')}</h1>
+            <p>{t('ocrSub')}</p>
           </header>
 
           {scanError && (
@@ -251,7 +253,7 @@ export const Scanner: React.FC = () => {
                   </button>
                   <div className="file-info-overlay">
                     <FileText size={18} />
-                    <span>Selected Prescription Image</span>
+                    <span>{t('selectedOverlayText')}</span>
                   </div>
                 </div>
               ) : (
@@ -259,10 +261,10 @@ export const Scanner: React.FC = () => {
                   <div className="dropzone-icon-glow">
                     <UploadCloud size={32} />
                   </div>
-                  <h3>Drag & Drop Prescription</h3>
-                  <p className="dropzone-subtitle">Supports JPG, PNG, PDF or camera snaps</p>
+                  <h3>{t('dragDropPrompt')}</h3>
+                  <p className="dropzone-subtitle">{t('dragDropSub')}</p>
                   <label className="btn btn-secondary upload-input-btn">
-                    Browse Files
+                    {t('browseFiles')}
                     <input 
                       type="file" 
                       accept="image/*" 
@@ -276,8 +278,8 @@ export const Scanner: React.FC = () => {
 
             {/* Preloaded Demo Prescriptions */}
             <div className="demo-select-panel">
-              <h3>Try Sample Prescriptions (Handwritten OCR Demo)</h3>
-              <p className="section-desc">Click a card to load pre-scanned mock handwriting samples.</p>
+              <h3>{t('demoSelectTitle')}</h3>
+              <p className="section-desc">{t('demoSelectSub')}</p>
               
               <div className="sample-cards-grid">
                 {SAMPLE_PRESCRIPTIONS.map(sample => (
@@ -295,8 +297,8 @@ export const Scanner: React.FC = () => {
                       <p>"{sample.rawHandwriting.split('\n')[3]}"</p>
                     </div>
                     <div className="sample-card-footer">
-                      <span>Date: {sample.date}</span>
-                      <span>{sample.parsedMeds.length} medicines</span>
+                      <span>{language === 'bn' ? 'তারিখ' : 'Date'}: {sample.date}</span>
+                      <span>{sample.parsedMeds.length} {language === 'bn' ? 'টি ওষুধ' : 'medicines'}</span>
                     </div>
                   </div>
                 ))}
@@ -307,7 +309,7 @@ export const Scanner: React.FC = () => {
                 onClick={handleStartScan}
                 disabled={!selectedFile && !selectedSampleId}
               >
-                <Sparkles size={16} /> Parse prescription with MedDNA AI
+                <Sparkles size={16} /> {t('parseActionBtn')}
               </button>
             </div>
 
@@ -359,12 +361,11 @@ export const Scanner: React.FC = () => {
         <div className="review-container animate-fade-in">
           <header className="view-header">
             <div className="flex-title-row">
-              <h1>Scan Results</h1>
-              <span className="badge badge-success"><Sparkles size={12} /> AI Extraction Complete</span>
+              <h1>{t('scanResultsHeader')}</h1>
+              <span className="badge badge-success"><Sparkles size={12} /> {t('aiCompleteBadge')}</span>
             </div>
             <p>
-              Found <strong>{editedMeds.length}</strong> medicine{editedMeds.length !== 1 ? 's' : ''} in this prescription. 
-              Select which ones to import into your dashboard.
+              {t('scanResultsSub', { count: editedMeds.length })}
             </p>
           </header>
 
@@ -374,7 +375,7 @@ export const Scanner: React.FC = () => {
             {(selectedFile || selectedSampleId !== 'custom') && (
               <div className="glass-card" style={{ padding: '1rem' }}>
                 <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <FileText size={14} /> Uploaded Document
+                  <FileText size={14} /> {t('uploadedDocHeader')}
                 </h3>
                 {selectedSampleId === 'custom' && selectedFile ? (
                   <div style={{ background: '#f5f5f5', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -401,14 +402,14 @@ export const Scanner: React.FC = () => {
             
             {/* OCR extracted text */}
             <div className="glass-card" style={{ padding: '1rem' }}>
-              <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem' }}>📝 Extracted OCR Text</h3>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem' }}>{t('extractedOcrHeader')}</h3>
               <div style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', maxHeight: '220px', overflowY: 'auto' }}>
                 <pre style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5 }}>
-                  {scanResult.rawText || '(No raw text extracted)'}
+                  {scanResult.rawText || t('noOcrText')}
                 </pre>
               </div>
               <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                Doctor: <strong>{scanResult.doctorName}</strong> • Specialty: {scanResult.specialty} • Date: {scanResult.date}
+                {language === 'bn' ? 'ডাক্তার' : 'Doctor'}: <strong>{scanResult.doctorName}</strong> • {language === 'bn' ? 'বিশেষত্ব' : 'Specialty'}: {scanResult.specialty} • {language === 'bn' ? 'তারিখ' : 'Date'}: {scanResult.date}
               </div>
             </div>
           </div>
@@ -417,27 +418,35 @@ export const Scanner: React.FC = () => {
           <div className="glass-card" style={{ padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
-                💊 Extracted Medicines ({editedMeds.length})
+                {t('extractedMedsHeader')} ({editedMeds.length})
               </h3>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button className="btn btn-secondary btn-xs" onClick={selectAllMeds} style={{ fontSize: '0.7rem' }}>Select All</button>
-                <button className="btn btn-secondary btn-xs" onClick={deselectAllMeds} style={{ fontSize: '0.7rem' }}>Deselect All</button>
+                <button className="btn btn-secondary btn-xs" onClick={selectAllMeds} style={{ fontSize: '0.7rem' }}>{t('selectAll')}</button>
+                <button className="btn btn-secondary btn-xs" onClick={deselectAllMeds} style={{ fontSize: '0.7rem' }}>{t('deselectAll')}</button>
                 <button className="btn btn-secondary btn-xs" onClick={handleAddField} style={{ fontSize: '0.7rem' }}>
-                  <Plus size={12} /> Add Manual
+                  <Plus size={12} /> {t('addManual')}
                 </button>
               </div>
             </div>
 
             {editedMeds.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>No medicines could be extracted from this document.</p>
-                <p style={{ fontSize: '0.8rem' }}>This might not be a prescription. You can add medicines manually using the button above.</p>
+                <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>{t('noMedsExtracted')}</p>
+                <p style={{ fontSize: '0.8rem' }}>{t('notAPrescNotice')}</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {editedMeds.map((med, idx) => {
                   const duplicate = isDuplicate(med.name);
                   const isSelected = med.selected;
+                  
+                  const timeLabels: Record<string, string> = {
+                    morning: language === 'bn' ? 'সকাল' : 'MORNING',
+                    afternoon: language === 'bn' ? 'দুপুর' : 'AFTERNOON',
+                    evening: language === 'bn' ? 'সন্ধ্যা' : 'EVENING',
+                    night: language === 'bn' ? 'রাত' : 'NIGHT'
+                  };
+
                   return (
                     <div 
                       key={idx} 
@@ -459,13 +468,13 @@ export const Scanner: React.FC = () => {
                         />
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>#{idx + 1} {med.name}</span>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{t('medNumLabel')} #{idx + 1} {med.name}</span>
                             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-primary-glow)', padding: '0.1rem 0.5rem', borderRadius: '4px' }}>
                               {med.dosage}
                             </span>
                             {duplicate && (
                               <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', background: 'rgba(234, 179, 8, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                                <AlertCircle size={10} /> DUPLICATE — Already in Dashboard
+                                <AlertCircle size={10} /> {t('medDuplicateBadge')}
                               </span>
                             )}
                           </div>
@@ -478,26 +487,26 @@ export const Scanner: React.FC = () => {
                       {/* Editable fields grid */}
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: '0.6rem' }}>
                         <div className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: '0.68rem' }}>Name</label>
+                          <label style={{ fontSize: '0.68rem' }}>{t('medNameLabel')}</label>
                           <input type="text" className="input-field" value={med.name} onChange={(e) => handleUpdateMed(idx, 'name', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
                         </div>
                         <div className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: '0.68rem' }}>Dosage</label>
+                          <label style={{ fontSize: '0.68rem' }}>{t('medDosageLabel')}</label>
                           <input type="text" className="input-field" value={med.dosage} onChange={(e) => handleUpdateMed(idx, 'dosage', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
                         </div>
                         <div className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: '0.68rem' }}>Duration</label>
+                          <label style={{ fontSize: '0.68rem' }}>{t('medDurationLabel')}</label>
                           <input type="text" className="input-field" value={med.duration} onChange={(e) => handleUpdateMed(idx, 'duration', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
                         </div>
                         <div className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ fontSize: '0.68rem' }}>Refills</label>
+                          <label style={{ fontSize: '0.68rem' }}>{t('medRefillsLabel')}</label>
                           <input type="number" className="input-field" value={med.refillsLeft} onChange={(e) => handleUpdateMed(idx, 'refillsLeft', parseInt(e.target.value) || 0)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
                         </div>
                       </div>
                       
                       {/* Timing pills */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>Schedule:</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t('medScheduleLabel')}</span>
                         {['morning', 'afternoon', 'evening', 'night'].map(time => {
                           const active = med.timing.includes(time);
                           return (
@@ -507,7 +516,7 @@ export const Scanner: React.FC = () => {
                               onClick={() => handleToggleTiming(idx, time)}
                               style={{ fontSize: '0.65rem', padding: '0.2rem 0.6rem' }}
                             >
-                              {time.toUpperCase()}
+                              {timeLabels[time]}
                             </button>
                           );
                         })}
@@ -515,7 +524,7 @@ export const Scanner: React.FC = () => {
 
                       {/* Instructions */}
                       <div style={{ marginTop: '0.5rem' }}>
-                        <input type="text" className="input-field" value={med.instructions} onChange={(e) => handleUpdateMed(idx, 'instructions', e.target.value)} placeholder="Instructions..." style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem', width: '100%' }} />
+                        <input type="text" className="input-field" value={med.instructions} onChange={(e) => handleUpdateMed(idx, 'instructions', e.target.value)} placeholder={language === 'bn' ? 'নির্দেশাবলী...' : "Instructions..."} style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem', width: '100%' }} />
                       </div>
                     </div>
                   );
@@ -526,19 +535,19 @@ export const Scanner: React.FC = () => {
             {/* Footer actions */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                <strong>{editedMeds.filter(m => m.selected).length}</strong> of {editedMeds.length} medicine{editedMeds.length !== 1 ? 's' : ''} selected for import
+                {t('selectedForImport', { selected: editedMeds.filter(m => m.selected).length, total: editedMeds.length })}
                 {editedMeds.some(m => m.selected && isDuplicate(m.name)) && (
-                  <span style={{ color: '#b45309', marginLeft: '0.75rem', fontWeight: 600 }}>⚠ Includes duplicates</span>
+                  <span style={{ color: '#b45309', marginLeft: '0.75rem', fontWeight: 600 }}>{t('includesDuplicates')}</span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button className="btn btn-secondary" onClick={cancelScanning}>Cancel</button>
+                <button className="btn btn-secondary" onClick={cancelScanning}>{t('cancel')}</button>
                 <button 
                   className="btn btn-primary" 
                   onClick={handleSave}
                   disabled={editedMeds.filter(m => m.selected).length === 0}
                 >
-                  <Check size={16} /> Import {editedMeds.filter(m => m.selected).length} Medicine{editedMeds.filter(m => m.selected).length !== 1 ? 's' : ''} to Dashboard
+                  <Check size={16} /> {t('importSelectedMeds', { count: editedMeds.filter(m => m.selected).length })}
                 </button>
               </div>
             </div>

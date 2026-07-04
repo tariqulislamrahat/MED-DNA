@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { ExtractedMedicine } from '../services/mockData';
 import { mockApi } from '../services/mockApi';
 import type { ScanResult } from '../services/mockApi';
+import { translations } from '../services/translations';
 
 export interface UserProfile {
   name: string;
@@ -62,6 +63,9 @@ interface MedContextType {
   interactionWarnings: { medA: string; medB: string; note: string }[];
   slotTimes: { morning: string; afternoon: string; evening: string; night: string };
   updateSlotTime: (slot: 'morning' | 'afternoon' | 'evening' | 'night', time: string) => void;
+  language: 'en' | 'bn';
+  setLanguage: (lang: 'en' | 'bn') => void;
+  t: (key: string, replacements?: Record<string, string | number>) => string;
   
   login: (email?: string, name?: string) => Promise<void>;
   logout: () => void;
@@ -137,6 +141,28 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('meddna_slot_times', JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const [language, setLanguageState] = useState<'en' | 'bn'>(() => {
+    const stored = localStorage.getItem('meddna_lang');
+    return (stored === 'bn' || stored === 'en') ? stored : 'en';
+  });
+
+  const setLanguage = (lang: 'en' | 'bn') => {
+    setLanguageState(lang);
+    localStorage.setItem('meddna_lang', lang);
+  };
+
+  const t = (key: string, replacements?: Record<string, string | number>): string => {
+    const dict = translations[language] || translations.en;
+    let translation = (dict as any)[key] || (translations.en as any)[key] || key;
+    
+    if (replacements) {
+      Object.keys(replacements).forEach(k => {
+        translation = translation.replace(`{${k}}`, String(replacements[k]));
+      });
+    }
+    return translation;
   };
 
   // Audio elements for SOS siren synthesized using Web Audio API
@@ -318,7 +344,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setScanResult(null);
     setScanError(null);
     try {
-      const result = await mockApi.scanPrescription(sampleId || 'pres_01', user?.email || 'anonymous');
+      const result = await mockApi.scanPrescription(sampleId || 'pres_01', user?.email || 'anonymous', language);
       setScanResult(result);
     } catch (e: any) {
       console.error("Scanning failed", e);
@@ -759,6 +785,9 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       interactionWarnings,
       slotTimes,
       updateSlotTime,
+      language,
+      setLanguage,
+      t,
       login,
       logout,
       startScanning,

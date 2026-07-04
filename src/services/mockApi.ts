@@ -15,8 +15,8 @@ export const mockApi = {
   /**
    * Sends the prescription image (base64) or sample id to the backend Express server
    */
-  scanPrescription: async (input: string, userId: string = 'anonymous'): Promise<ScanResult> => {
-    let payload: { image?: string; sampleId?: string; userId: string } = { userId };
+  scanPrescription: async (input: string, userId: string = 'anonymous', language: string = 'en'): Promise<ScanResult> => {
+    let payload: { image?: string; sampleId?: string; userId: string; language: string } = { userId, language };
     
     // Check if input is a base64 data URL (real uploaded image)
     if (input.startsWith('data:image/')) {

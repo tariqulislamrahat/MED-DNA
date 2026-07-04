@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const Pharmacy: React.FC = () => {
-  const { medicines, checkoutRefills } = useMed();
+  const { medicines, checkoutRefills, language, t } = useMed();
   const [loading, setLoading] = useState(false);
   const [pharmacies, setPharmacies] = useState<(PharmacyType & { totalEstimatedPrice: number; availableCount: number })[]>([]);
   const [cheapestId, setCheapestId] = useState('');
@@ -49,28 +49,32 @@ export const Pharmacy: React.FC = () => {
   return (
     <div className="pharmacy-view animate-fade-in">
       <header className="view-header">
-        <h1>Local Pharmacy Price Comparison</h1>
-        <p>Compare costs for your active medications across local stores. Highlight the cheapest option and request direct refills.</p>
+        <h1>{t('pharmacyHeader')}</h1>
+        <p>{t('pharmacySub')}</p>
       </header>
 
       {medNames.length === 0 ? (
         <div className="glass-card empty-meds-card">
           <ShoppingBag size={48} />
-          <h3>No Medications to Compare</h3>
-          <p>Please upload a prescription or add medicines to calculate pricing estimations.</p>
+          <h3>{t('noMedsCompare')}</h3>
+          <p>{t('noMedsCompareSub')}</p>
         </div>
       ) : loading ? (
         <div className="glass-card loading-card">
           <div className="spinner" />
-          <p>Analyzing local catalog prices and calculating totals...</p>
+          <p>{language === 'bn' ? 'স্থানীয় ক্যাটালগ মূল্য বিশ্লেষণ এবং মোট হিসাব করা হচ্ছে...' : 'Analyzing local catalog prices and calculating totals...'}</p>
         </div>
       ) : (
         <div className="pharmacy-layout-grid">
           
           {/* Left Side: Pricing List Cards */}
           <div className="pharmacies-list-panel">
-            <h3>Nearby Pharmacy Quotes</h3>
-            <p className="subtitle-text">Prices calculated for your total set of {medNames.length} active medicines.</p>
+            <h3>{t('nearbyQuotes')}</h3>
+            <p className="subtitle-text">
+              {language === 'bn'
+                ? `আপনার মোট ${medNames.length} টি সক্রিয় ওষুধের জন্য মূল্য নির্ধারণ করা হয়েছে।`
+                : `Prices calculated for your total set of ${medNames.length} active medicines.`}
+            </p>
             
             <div className="quotes-stack">
               {pharmacies.map((pharm) => {
@@ -83,30 +87,34 @@ export const Pharmacy: React.FC = () => {
                     {isCheapest && (
                       <div className="cheapest-badge-banner">
                         <TrendingDown size={14} />
-                        <span>CHEAPEST ESTIMATE (SAVE 15%)</span>
+                        <span>{t('cheapestEstimate')}</span>
                       </div>
                     )}
 
                     <div className="quote-main-row">
                       <div className="pharmacy-meta-col">
                         <h4>{pharm.name}</h4>
-                        <span className="distance-lbl"><MapPin size={12} /> {pharm.distance} miles away</span>
+                        <span className="distance-lbl"><MapPin size={12} /> {pharm.distance} {language === 'bn' ? 'মাইল দূরে' : 'miles away'}</span>
                         <div className="rating-row">
                           <Star size={12} className="star-filled" />
-                          <span>{pharm.rating} Rating</span>
+                          <span>{pharm.rating} {language === 'bn' ? 'রেটিং' : 'Rating'}</span>
                         </div>
                       </div>
 
                       <div className="price-total-col">
-                        <span className="total-lbl">Total Estimated Price</span>
+                        <span className="total-lbl">{t('totalEstimatedPrice')}</span>
                         <span className="total-val">${pharm.totalEstimatedPrice.toFixed(2)}</span>
-                        <span className="availability-lbl">All {pharm.availableCount} items in stock</span>
+                        <span className="availability-lbl">
+                          {language === 'bn'
+                            ? `সব ${pharm.availableCount} টি আইটেম স্টক আছে`
+                            : `All ${pharm.availableCount} items in stock`}
+                        </span>
                       </div>
                     </div>
 
                     {/* Expandable itemized pricing */}
                     <div className="itemized-prices-section">
-                      <h5>Itemized Estimations:</h5>
+                      <h5>{t('itemizedEstimations')}</h5>
                       <div className="itemized-grid">
                         {medicines.map(med => {
                           const price = pharm.prices[med.name] || 10.00;
@@ -129,7 +137,7 @@ export const Pharmacy: React.FC = () => {
                         className={`btn ${isCheapest ? 'btn-primary' : 'btn-secondary'}`}
                         onClick={() => handlePlaceOrder(pharm.name)}
                       >
-                        Order Refills
+                        {t('orderRefills')}
                       </button>
                     </div>
                   </div>
@@ -141,8 +149,8 @@ export const Pharmacy: React.FC = () => {
           {/* Right Side: Mock Map view */}
           <div className="map-view-panel">
             <div className="glass-card map-card">
-              <h3>Live Pharmacy Locator Map</h3>
-              <p className="card-desc">Visualizing locations relative to your current clinic coordinates.</p>
+              <h3>{t('liveMap')}</h3>
+              <p className="card-desc">{t('liveMapSub')}</p>
               
               <div className="map-canvas-mock">
                 {/* Custom SVG Map Representation */}
@@ -187,8 +195,8 @@ export const Pharmacy: React.FC = () => {
               </div>
 
               <div className="map-legend">
-                <div className="legend-item"><span className="legend-dot user-color" /><span>Your Location</span></div>
-                <div className="legend-item"><span className="legend-dot cheapest-color" /><span>Cheapest Clinic Pharmacy</span></div>
+                <div className="legend-item"><span className="legend-dot user-color" /><span>{t('yourLocation')}</span></div>
+                <div className="legend-item"><span className="legend-dot cheapest-color" /><span>{t('cheapestClinic')}</span></div>
               </div>
             </div>
           </div>
@@ -203,18 +211,22 @@ export const Pharmacy: React.FC = () => {
             <div className="modal-icon-success">
               <CheckCircle size={44} />
             </div>
-            <h2>Refill Order Placed!</h2>
-            <p>Your order for <strong>{medNames.join(', ')}</strong> has been successfully transmitted to <strong>{orderedPharmacy}</strong>.</p>
+            <h2>{t('refillOrderPlaced')}</h2>
+            <p>
+              {language === 'bn'
+                ? `আপনার ওষুধের (${medNames.join(', ')}) অর্ডার সফলভাবে ${orderedPharmacy} এ পাঠানো হয়েছে।`
+                : `Your order for ${medNames.join(', ')} has been successfully transmitted to ${orderedPharmacy}.`}
+            </p>
             
             <div className="delivery-time-card">
-              <span>Estimated Delivery Window:</span>
-              <h3>Within 2 Hours (Courier Delivery)</h3>
+              <span>{t('estimatedDelivery')}</span>
+              <h3>{t('courierDelivery')}</h3>
             </div>
             
-            <p className="order-subtext">A confirmation receipt and tracking link have been dispatched to your email (alex.mercer@gmail.com).</p>
+            <p className="order-subtext">{t('confirmationSent')}</p>
             
             <button className="btn btn-primary" onClick={() => setOrderModalOpen(false)}>
-              Close Window
+              {t('closeWindow')}
             </button>
           </div>
         </div>

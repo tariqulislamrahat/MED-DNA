@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const Tracker: React.FC = () => {
-  const { medicines, adherenceRecords, toggleDose } = useMed();
+  const { medicines, adherenceRecords, toggleDose, language, t } = useMed();
   
   // State for the selected day in calendar (defaults to today)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -130,8 +130,8 @@ export const Tracker: React.FC = () => {
   return (
     <div className="tracker-view animate-fade-in">
       <header className="view-header">
-        <h1>Adherence Calendar Tracker</h1>
-        <p>Log past check-offs, verify history records, and monitor your consecutive medication streaks.</p>
+        <h1>{t('trackerHeader')}</h1>
+        <p>{t('trackerSub')}</p>
       </header>
 
       {/* Stats Summary Panel */}
@@ -143,9 +143,9 @@ export const Tracker: React.FC = () => {
             <Flame size={32} className={`streak-fire-icon ${streakVal > 0 ? 'active' : ''}`} />
           </div>
           <div className="streak-text-group">
-            <span className="streak-title">Adherence Streak</span>
-            <h2 className="streak-value">{streakVal} {streakVal === 1 ? 'Day' : 'Days'}</h2>
-            <p className="streak-subtitle">Keep checking off doses daily to build your health streak!</p>
+            <span className="streak-title">{t('adherenceStreak')}</span>
+            <h2 className="streak-value">{streakVal} {streakVal === 1 ? (language === 'bn' ? 'দিন' : 'Day') : (language === 'bn' ? 'দিন' : 'Days')}</h2>
+            <p className="streak-subtitle">{t('streakBannerDesc')}</p>
           </div>
         </div>
 
@@ -155,10 +155,10 @@ export const Tracker: React.FC = () => {
             <TrendingUp size={24} />
           </div>
           <div>
-            <span className="stat-lbl">Today's Compliance</span>
+            <span className="stat-lbl">{t('todaysCompliance')}</span>
             <div className="compliance-row">
               <h2 className="stat-value">{completionPercentage}%</h2>
-              <span className="fraction-lbl">({takenDoses}/{totalDoses} doses)</span>
+              <span className="fraction-lbl">({takenDoses}/{totalDoses} {language === 'bn' ? 'টি ডোজ' : 'doses'})</span>
             </div>
             <div className="compliance-bar-container">
               <div 
@@ -178,7 +178,7 @@ export const Tracker: React.FC = () => {
           </button>
           
           <h3 className="belt-current-month">
-            {selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            {selectedDate.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { month: 'long', year: 'numeric' })}
           </h3>
 
           <button className="btn btn-secondary date-nav-btn" onClick={() => changeDateByAmount(1)}>
@@ -212,8 +212,8 @@ export const Tracker: React.FC = () => {
                 onClick={() => handleDaySelect(day)}
                 disabled={isFuture}
               >
-                <span className="day-name">{day.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                <span className="day-num">{day.getDate()}</span>
+                <span className="day-name">{day.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short' })}</span>
+                <span className="day-num">{day.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { day: 'numeric' })}</span>
                 {isFullyCompleted && <span className="day-completed-dot" />}
                 {!isFullyCompleted && dayDoses.length > 0 && takenCount > 0 && (
                   <span className="day-partial-dot" />
@@ -231,16 +231,22 @@ export const Tracker: React.FC = () => {
             <Calendar size={18} className="icon-teal" />
             <h3>
               {selectedDateStr === todayStr 
-                ? "Today's Schedule Checklist" 
-                : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'long' })} Log`}
+                ? t('todaysScheduleChecklist') 
+                : language === 'bn'
+                  ? `${selectedDate.toLocaleDateString('bn-BD', { month: 'short', day: 'numeric', weekday: 'long' })} এর লগ`
+                  : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'long' })} Log`}
             </h3>
           </div>
-          <span className="badge badge-info">{takenDoses} of {totalDoses} Taken</span>
+          <span className="badge badge-info">
+            {language === 'bn'
+              ? `${takenDoses} / ${totalDoses} সম্পন্ন`
+              : `${takenDoses} of ${totalDoses} Taken`}
+          </span>
         </div>
 
         {totalDoses === 0 ? (
           <div className="empty-day-state">
-            <p>No active medications were scheduled on this date.</p>
+            <p>{t('noMedsScheduledOnDate')}</p>
           </div>
         ) : (
           <div className="tracker-doses-list">
@@ -249,13 +255,22 @@ export const Tracker: React.FC = () => {
               const isTaken = selectedDayRecords[doseKey]?.taken;
               const isFuture = isFutureDate(selectedDate);
 
+              const timeLabels: Record<string, string> = {
+                morning: language === 'bn' ? 'সকাল' : 'MORNING',
+                afternoon: language === 'bn' ? 'দুপুর' : 'AFTERNOON',
+                evening: language === 'bn' ? 'সন্ধ্যা' : 'EVENING',
+                night: language === 'bn' ? 'রাত' : 'NIGHT'
+              };
+
               return (
                 <div key={idx} className={`tracker-dose-row ${isTaken ? 'completed' : ''}`}>
                   <button 
                     className="tracker-check-btn"
                     onClick={() => toggleDose(selectedDateStr, dose.medId, dose.timing)}
                     disabled={isFuture}
-                    title={isTaken ? "Mark as missed" : "Mark as taken"}
+                    title={isTaken 
+                      ? (language === 'bn' ? 'বাদ গেছে হিসেবে চিহ্নিত করুন' : "Mark as missed") 
+                      : (language === 'bn' ? 'গৃহীত হিসেবে চিহ্নিত করুন' : "Mark as taken")}
                   >
                     {isTaken ? (
                       <CheckCircle2 size={22} className="check-success" />
@@ -267,14 +282,16 @@ export const Tracker: React.FC = () => {
                   <div className="dose-info-wrapper">
                     <span className="med-title">{dose.medName} <span className="med-dosage">{dose.dosage}</span></span>
                     <div className="dose-timings">
-                      <span className="timing-label-pill">{dose.timing.toUpperCase()}</span>
+                      <span className="timing-label-pill">{timeLabels[dose.timing.toLowerCase()] || dose.timing.toUpperCase()}</span>
                       {dose.instructions && <span className="inst-sub">| {dose.instructions}</span>}
                     </div>
                   </div>
 
                   {isTaken && selectedDayRecords[doseKey]?.takenAt && (
                     <span className="taken-timestamp">
-                      Checked at {selectedDayRecords[doseKey].takenAt}
+                      {language === 'bn'
+                        ? `গৃহীত হয়েছে: ${selectedDayRecords[doseKey].takenAt}`
+                        : `Checked at ${selectedDayRecords[doseKey].takenAt}`}
                     </span>
                   )}
                 </div>

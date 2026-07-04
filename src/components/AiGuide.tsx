@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { useMed } from '../context/MedContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -8,17 +9,28 @@ interface Message {
 }
 
 export const AiGuide: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hello! I am your MedDNA AI Health Guide. I am programmed to assist you with medical queries, drug interactions, usage guidelines, safety profiles, and general health inquiries. Please note that I am strictly restricted to health and medicine topics."
-    }
-  ]);
+  const { language, t } = useMed();
+  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const suggestionChips = [
+  useEffect(() => {
+    setMessages([
+      {
+        role: 'assistant',
+        content: t('aiGreeting')
+      }
+    ]);
+  }, [language]);
+
+  const suggestionChips = language === 'bn' ? [
+    "লিসিনোপ্রিলের পার্শ্বপ্রতিক্রিয়া কি কি?",
+    "আমি কি অ্যাসপিরিনের সাথে অ্যাডভিল নিতে পারি?",
+    "রাতে অ্যাটোরভাস্ট্যাটিন নেওয়ার পরামর্শ দেওয়া হয় কেন?",
+    "অ্যামোক্সিসিলিন কীভাবে ব্যাকটেরিয়াল ইনফেকশন নিরাময় করে?"
+  ] : [
     "What are side effects of Lisinopril?",
     "Can I take Aspirin with Advil?",
     "Why is taking Atorvastatin at night recommended?",
@@ -51,7 +63,7 @@ export const AiGuide: React.FC = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ messages: payloadMessages })
+        body: JSON.stringify({ messages: payloadMessages, language })
       });
 
       if (!res.ok) {
@@ -64,7 +76,9 @@ export const AiGuide: React.FC = () => {
       const contentUpper = data.reply.toUpperCase();
       const isDeclined = contentUpper.includes("DECLINE") || 
                          contentUpper.includes("UNABLE TO ANSWER") || 
-                         contentUpper.includes("ONLY ASSIST WITH MEDICAL");
+                         contentUpper.includes("ONLY ASSIST WITH MEDICAL") ||
+                         contentUpper.includes("প্রত্যাখ্যান") ||
+                         contentUpper.includes("দুঃখিত, আমি কেবল");
 
       setMessages(prev => [
         ...prev, 
@@ -80,7 +94,7 @@ export const AiGuide: React.FC = () => {
         ...prev, 
         { 
           role: 'assistant', 
-          content: "Sorry, I am having trouble connecting to my clinical AI model right now. Please try again in a few moments." 
+          content: t('aiErrorConnecting')
         }
       ]);
     } finally {
@@ -97,7 +111,7 @@ export const AiGuide: React.FC = () => {
     setMessages([
       {
         role: 'assistant',
-        content: "Chat logs cleared. Ask me any medication or clinical safety questions to begin again."
+        content: language === 'bn' ? 'চ্যাট ইতিহাস মুছে ফেলা হয়েছে। শুরু করতে যেকোনো ওষুধ বা ক্লিনিক্যাল নিরাপত্তা সম্পর্কিত প্রশ্ন জিজ্ঞাসা করুন।' : "Chat logs cleared. Ask me any medication or clinical safety questions to begin again."
       }
     ]);
   };
@@ -106,11 +120,11 @@ export const AiGuide: React.FC = () => {
     <div className="ai-guide-view animate-fade-in">
       <header className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1>AI Health Assistant</h1>
-          <p>Consult with MedDNA's specialized AI guide on drug dosages, warnings, and wellness recommendations.</p>
+          <h1>{t('aiGuideHeader')}</h1>
+          <p>{t('aiGuideSub')}</p>
         </div>
         <button className="btn btn-secondary btn-xs" onClick={handleResetChat} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <RefreshCw size={12} /> Clear Chat
+          <RefreshCw size={12} /> {t('clearChat')}
         </button>
       </header>
 
@@ -119,7 +133,7 @@ export const AiGuide: React.FC = () => {
         <div className="glass-card chat-box-card">
           <div className="chat-header-banner">
             <Sparkles size={16} className="sparkle-icon" />
-            <span>MedDNA AI Guide • Clinical Safety Filter Active</span>
+            <span>{t('aiBanner')}</span>
           </div>
 
           <div className="chat-messages-area">
@@ -132,7 +146,7 @@ export const AiGuide: React.FC = () => {
                   <p className="message-text">{msg.content}</p>
                   {msg.isDeclined && (
                     <span className="decline-warning-badge">
-                      <AlertCircle size={10} /> Non-medical topic restricted
+                      <AlertCircle size={10} /> {t('nonMedicalRestricted')}
                     </span>
                   )}
                 </div>
@@ -155,7 +169,7 @@ export const AiGuide: React.FC = () => {
             <input 
               type="text" 
               className="chat-input-field" 
-              placeholder="Ask about side effects, safety guidelines, interactions..."
+              placeholder={t('chatPlaceholder')}
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               disabled={loading}
@@ -170,8 +184,8 @@ export const AiGuide: React.FC = () => {
         {/* Right column: active context & quick chips */}
         <div className="chat-sidebar-panel">
           <div className="glass-card sidebar-card">
-            <h3>Quick Query Suggestions</h3>
-            <p className="sidebar-desc">Tap one of the prompts below to automatically ask the guide:</p>
+            <h3>{t('quickSuggestions')}</h3>
+            <p className="sidebar-desc">{t('quickSuggestionsDesc')}</p>
             <div className="suggestions-stack">
               {suggestionChips.map((chip, idx) => (
                 <button 
@@ -187,11 +201,11 @@ export const AiGuide: React.FC = () => {
           </div>
 
           <div className="glass-card sidebar-card border-accent" style={{ marginTop: '1.25rem' }}>
-            <h3>Guidance Safeguards</h3>
+            <h3>{t('guidanceSafeguards')}</h3>
             <ul className="safeguard-bullet-list">
-              <li>Answers are filtered to prevent medical diagnosis or surgical advice.</li>
-              <li>Only handles clinical drug, disease, prescription, and wellness queries.</li>
-              <li>System strictly refuses non-medical topics (e.g. general code, business, math).</li>
+              <li>{t('safeguard1')}</li>
+              <li>{t('safeguard2')}</li>
+              <li>{t('safeguard3')}</li>
             </ul>
           </div>
         </div>

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 export const Analytics: React.FC = () => {
-  const { medicines, adherenceRecords } = useMed();
+  const { medicines, adherenceRecords, language, t } = useMed();
   const [selectedMedFilter, setSelectedMedFilter] = React.useState<string>('all');
 
   // 1. Generate last 7 days of data for the SVG bar chart
@@ -43,7 +43,7 @@ export const Analytics: React.FC = () => {
       const percentage = totalDoses > 0 ? Math.round((takenDoses / totalDoses) * 100) : 0;
       
       weeklyList.push({
-        label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        label: d.toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', { weekday: 'short' }),
         dateStr,
         percentage,
         totalDoses,
@@ -133,19 +133,19 @@ export const Analytics: React.FC = () => {
     <div className="analytics-view animate-fade-in">
       <header className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
         <div>
-          <h1>Adherence Analytics</h1>
-          <p>Inspect compliance stats, analyze weekday trends, and verify your 30-day health calendar.</p>
+          <h1>{t('analyticsHeader')}</h1>
+          <p>{t('analyticsSub')}</p>
         </div>
         {medicines.length > 0 && (
           <div className="filter-dropdown-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Filter:</span>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>{language === 'bn' ? 'ফিল্টার:' : 'Filter:'}</span>
             <select 
               className="input-field" 
               value={selectedMedFilter} 
               onChange={(e) => setSelectedMedFilter(e.target.value)}
               style={{ width: '200px', padding: '0.4rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600 }}
             >
-              <option value="all">📊 All Medications</option>
+              <option value="all">📊 {language === 'bn' ? 'সব ওষুধ' : 'All Medications'}</option>
               {medicines.map(m => (
                 <option key={m.id} value={m.id}>💊 {m.name} ({m.dosage})</option>
               ))}
@@ -159,29 +159,29 @@ export const Analytics: React.FC = () => {
         <div className="glass-card widget-card">
           <div className="widget-icon primary-color"><Percent size={22} /></div>
           <div className="widget-details">
-            <span className="widget-lbl">Weekly Average</span>
+            <span className="widget-lbl">{t('weeklyAverage')}</span>
             <h2 className="widget-val">{averageAdherence}%</h2>
-            <p className="widget-sub">Average taken rate across last 7 days</p>
+            <p className="widget-sub">{t('average7Days')}</p>
           </div>
         </div>
 
         <div className="glass-card widget-card">
           <div className="widget-icon success-color"><Award size={22} /></div>
           <div className="widget-details">
-            <span className="widget-lbl">Health Score</span>
+            <span className="widget-lbl">{t('healthScore')}</span>
             <h2 className="widget-val">
               {averageAdherence >= 90 ? 'A+' : averageAdherence >= 75 ? 'B' : averageAdherence > 0 ? 'C-' : 'N/A'}
             </h2>
-            <p className="widget-sub">Overall grade based on adherence</p>
+            <p className="widget-sub">{t('overallGrade')}</p>
           </div>
         </div>
 
         <div className="glass-card widget-card">
           <div className="widget-icon accent-color"><TrendingUp size={22} /></div>
           <div className="widget-details">
-            <span className="widget-lbl">Consistency Trend</span>
+            <span className="widget-lbl">{t('consistencyTrend')}</span>
             <h2 className="widget-val">+4.2%</h2>
-            <p className="widget-sub">Improvement compared to prior week</p>
+            <p className="widget-sub">{language === 'bn' ? 'পূর্ববর্তী সপ্তাহের তুলনায় উন্নতি' : 'Improvement compared to prior week'}</p>
           </div>
         </div>
       </div>
@@ -192,12 +192,12 @@ export const Analytics: React.FC = () => {
         <div className="glass-card chart-container-card">
           <div className="chart-header">
             <BarChart3 size={18} className="chart-icon" />
-            <h3>7-Day Adherence Details</h3>
+            <h3>{t('sevenDayAdherence')}</h3>
           </div>
 
           {medicines.length === 0 ? (
             <div className="empty-chart-state">
-              <p>No active medications to chart. Upload a prescription to start tracking statistics.</p>
+              <p>{t('noActiveMedsChart')}</p>
             </div>
           ) : (
             <div className="svg-chart-wrapper">
@@ -290,17 +290,19 @@ export const Analytics: React.FC = () => {
         <div className="glass-card heatmap-container-card">
           <div className="chart-header">
             <Calendar size={18} className="chart-icon" />
-            <h3>30-Day Adherence Matrix</h3>
+            <h3>{t('thirtyDayAdherence')}</h3>
           </div>
 
-          <p className="card-desc">Daily consistency history across the past 30 days. Color codes highlight completion ratios.</p>
+          <p className="card-desc">{t('heatmapDesc')}</p>
 
           <div className="heatmap-grid">
             {monthlyCells.map((cell, idx) => (
               <div 
                 key={idx} 
                 className={`heatmap-cell ${cell.status}`}
-                title={`Date: ${cell.dateStr} | Status: ${cell.taken}/${cell.total} doses taken`}
+                title={language === 'bn' 
+                  ? `তারিখ: ${cell.dateStr} | অবস্থা: ${cell.taken}/${cell.total} টি ডোজ সম্পন্ন`
+                  : `Date: ${cell.dateStr} | Status: ${cell.taken}/${cell.total} doses taken`}
               >
                 <span className="cell-num">{cell.dayNum}</span>
               </div>
@@ -308,10 +310,10 @@ export const Analytics: React.FC = () => {
           </div>
 
           <div className="heatmap-legend">
-            <div className="legend-cell-item"><span className="legend-square full" /><span>100% Doses</span></div>
-            <div className="legend-cell-item"><span className="legend-square partial" /><span>Partial</span></div>
-            <div className="legend-cell-item"><span className="legend-square missed" /><span>0% Taken</span></div>
-            <div className="legend-cell-item"><span className="legend-square empty" /><span>No Meds</span></div>
+            <div className="legend-cell-item"><span className="legend-square full" /><span>{t('hundredPercentDoses')}</span></div>
+            <div className="legend-cell-item"><span className="legend-square partial" /><span>{t('partialLegend')}</span></div>
+            <div className="legend-cell-item"><span className="legend-square missed" /><span>{t('zeroPercentTaken')}</span></div>
+            <div className="legend-cell-item"><span className="legend-square empty" /><span>{t('noMedsLegend')}</span></div>
           </div>
         </div>
 
@@ -322,9 +324,9 @@ export const Analytics: React.FC = () => {
         <div className="glass-card meds-insights-card" style={{ marginTop: '1.5rem', textAlign: 'left' }}>
           <div className="chart-header" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
             <Award size={18} className="chart-icon" />
-            <h3>Individual Medication Insights</h3>
+            <h3>{t('individualInsights')}</h3>
           </div>
-          <p className="card-desc" style={{ marginBottom: '1.25rem' }}>Compliance rate calculated per medication across the last 30 days.</p>
+          <p className="card-desc" style={{ marginBottom: '1.25rem' }}>{t('individualInsightsSub')}</p>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
             {medicines.map((med) => {
@@ -347,8 +349,8 @@ export const Analytics: React.FC = () => {
                   </div>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.6rem' }}>
-                    <span>Refills: {med.refillsLeft}</span>
-                    <span>Starts: {med.startDate}</span>
+                    <span>{language === 'bn' ? 'রিফিল:' : 'Refills:'} {med.refillsLeft}</span>
+                    <span>{language === 'bn' ? 'শুরু:' : 'Starts:'} {med.startDate}</span>
                   </div>
                 </div>
               );

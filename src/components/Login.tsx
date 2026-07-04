@@ -3,7 +3,7 @@ import { useMed } from '../context/MedContext';
 import { Sparkles, X, UserPlus } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const { login } = useMed();
+  const { login, language, setLanguage, t } = useMed();
   const [showSelector, setShowSelector] = useState(false);
   const [loading, setLoading] = useState(false);
   const [customMode, setCustomMode] = useState(false);
@@ -31,6 +31,19 @@ export const Login: React.FC = () => {
   return (
     <div className="login-page">
       <div className="login-card glass-card">
+        {/* Language Toggle */}
+        <div style={{ alignSelf: 'flex-end', marginBottom: '-0.75rem' }}>
+          <button 
+            type="button"
+            className="sidebar-lang-btn"
+            onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
+            style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem', height: 'auto' }}
+          >
+            <span>🌐</span>
+            <span>{language === 'en' ? 'বাংলা' : 'English'}</span>
+          </button>
+        </div>
+
         <div className="login-logo-wrapper">
           <div className="login-logo-mark">
             <span>M</span>
@@ -38,20 +51,20 @@ export const Login: React.FC = () => {
           <h1 className="login-brand">Med<span className="login-accent">DNA</span></h1>
         </div>
 
-        <p className="login-tagline">Your intelligent medical companion for prescription management, dose tracking, and pharmacy lookup.</p>
+        <p className="login-tagline">{t('loginTagline')}</p>
 
         <div className="login-features-row">
           <div className="login-feature-chip">
             <Sparkles size={12} />
-            <span>AI OCR Scanner</span>
+            <span>{t('aiOcrScanner')}</span>
           </div>
           <div className="login-feature-chip">
             <Sparkles size={12} />
-            <span>Dose Tracker</span>
+            <span>{t('tracker')}</span>
           </div>
           <div className="login-feature-chip">
             <Sparkles size={12} />
-            <span>Smart Reminders</span>
+            <span>{t('smartReminders')}</span>
           </div>
         </div>
 
@@ -62,10 +75,10 @@ export const Login: React.FC = () => {
             <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
             <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58(9 3.58z" fill="#EA4335"/>
           </svg>
-          <span>Continue with Google</span>
+          <span>{t('continueGoogle')}</span>
         </button>
 
-        <p className="login-disclaimer">By signing in, you agree to our Terms of Service and Privacy Policy.</p>
+        <p className="login-disclaimer">{t('termsNotice')}</p>
       </div>
 
       {/* Google Sign-in Selector Modal */}
@@ -79,8 +92,8 @@ export const Login: React.FC = () => {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
               </svg>
-              <h3>Sign in with Google</h3>
-              <p>Choose an account to continue to MedDNA</p>
+              <h3>{t('gSignInTitle')}</h3>
+              <p>{t('gSignInSub')}</p>
               <button className="g-close-btn" onClick={() => { setShowSelector(false); setCustomMode(false); }} disabled={loading}>
                 <X size={16} />
               </button>
@@ -89,12 +102,12 @@ export const Login: React.FC = () => {
             {loading ? (
               <div className="google-loading-body">
                 <div className="g-spinner" />
-                <p>Authenticating credentials...</p>
+                <p>{t('gAuth')}</p>
               </div>
             ) : customMode ? (
               <form onSubmit={handleCustomSubmit} className="g-custom-form">
                 <div className="g-input-group">
-                  <label>Full Name</label>
+                  <label>{t('gFullName')}</label>
                   <input 
                     type="text" 
                     className="g-input" 
@@ -106,7 +119,7 @@ export const Login: React.FC = () => {
                   />
                 </div>
                 <div className="g-input-group">
-                  <label>Email Address</label>
+                  <label>{t('gEmailAddress')}</label>
                   <input 
                     type="email" 
                     className="g-input" 
@@ -118,10 +131,10 @@ export const Login: React.FC = () => {
                 </div>
                 <div className="g-form-actions">
                   <button type="button" className="g-back-btn" onClick={() => setCustomMode(false)}>
-                    Back to Accounts
+                    {t('gBackToAccounts')}
                   </button>
                   <button type="submit" className="g-submit-btn">
-                    Sign In
+                    {t('gSignInBtn')}
                   </button>
                 </div>
               </form>
@@ -162,15 +175,15 @@ export const Login: React.FC = () => {
                 >
                   <div className="g-avatar-icon"><UserPlus size={16} /></div>
                   <div className="g-profile-details">
-                    <span className="g-name">Use another Google Account</span>
-                    <span className="g-email">Sign in with a custom name and email</span>
+                    <span className="g-name">{t('gUseAnother')}</span>
+                    <span className="g-email">{t('gCustomNotice')}</span>
                   </div>
                 </button>
               </div>
             )}
 
             <div className="google-footer">
-              <span>To continue, Google will share your name, email address, language preference, and profile picture with MedDNA.</span>
+              <span>{t('gFooter')}</span>
             </div>
           </div>
         </div>
