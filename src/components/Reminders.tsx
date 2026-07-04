@@ -20,20 +20,54 @@ export const Reminders: React.FC = () => {
     triggerSOS,
     sosTriggered,
     resetSOS,
-    sendPushTest
+    userCoordinates,
+    sendPushTest,
+    slotTimes,
+    updateSlotTime,
+    emailLogs,
+    fetchEmailLogs
   } = useMed();
 
   const [contactName, setContactName] = useState(emergencyContact.name);
   const [contactPhone, setContactPhone] = useState(emergencyContact.phone);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [countdownActive, setCountdownActive] = useState(false);
+  const [countdownTime, setCountdownTime] = useState(5);
+  const countdownIntervalRef = React.useRef<any>(null);
 
-  // Time picker defaults
-  const [slotTimes, setSlotTimes] = useState({
-    morning: '08:00',
-    afternoon: '13:00',
-    evening: '18:00',
-    night: '22:00'
-  });
+  const startCountdown = () => {
+    setCountdownActive(true);
+    setCountdownTime(5);
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdownTime(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownIntervalRef.current);
+          setCountdownActive(false);
+          triggerSOS();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const cancelCountdown = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setCountdownActive(false);
+    setCountdownTime(5);
+  };
+
+  React.useEffect(() => {
+    fetchEmailLogs();
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleSaveContact = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,11 +76,8 @@ export const Reminders: React.FC = () => {
     setTimeout(() => setSaveSuccess(false), 2000);
   };
 
-  const handleTimeChange = (slot: keyof typeof slotTimes, val: string) => {
-    setSlotTimes(prev => ({
-      ...prev,
-      [slot]: val
-    }));
+  const handleTimeChange = (slot: 'morning' | 'afternoon' | 'evening' | 'night', val: string) => {
+    updateSlotTime(slot, val);
   };
 
   const testEmailNotification = () => {
@@ -171,6 +202,28 @@ export const Reminders: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Email Logs Section */}
+          <div className="email-logs-list-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+            <h4>Simulated Email Dispatch Logs</h4>
+            <p className="section-desc" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Logs of emails saved to MongoDB when reminders fire or SOS is triggered.</p>
+            {emailLogs.length === 0 ? (
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>No emails sent yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {emailLogs.map((log) => (
+                  <div key={log.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem' }}>
+                      <span style={{ fontWeight: 'bold', color: 'var(--color-primary)' }}>To: {log.recipient}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString()}</span>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', margin: '0.15rem 0' }}>{log.subject}</span>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{log.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Side: Emergency SOS Configuration */}
@@ -215,7 +268,7 @@ export const Reminders: React.FC = () => {
             <h4>Trigger Panic SOS</h4>
             <p className="section-desc">Instantly triggers audible alarm logs, alerts the designated responder, and contacts emergency medical services.</p>
             
-            <button className="panic-panic-btn" onClick={triggerSOS}>
+            <button className="panic-panic-btn" onClick={startCountdown}>
               <ShieldAlert size={36} />
               <span>ACTIVATE SOS</span>
             </button>
@@ -223,6 +276,73 @@ export const Reminders: React.FC = () => {
         </div>
 
       </div>
+
+      {/* 5-Second SOS Countdown Overlay */}
+      {countdownActive && (
+        <div className="google-overlay sos-countdown-overlay" style={{ background: 'rgba(0,0,0,0.85)' }}>
+          <div className="google-modal glass-card" style={{ maxWidth: '380px', textAlign: 'center', borderColor: 'var(--color-danger)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.25rem', padding: '1rem 0' }}>
+              <div className="countdown-ring" style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(239,68,68,0.1)', border: '4px solid var(--color-danger)', display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', fontSize: '2.5rem', fontWeight: 900, color: 'var(--color-danger)', animation: 'pulse 1s infinite' }}>
+                {countdownTime}
+              </div>
+              <div style={{ marginTop: '0.5rem' }}>
+                <h3 style={{ color: 'var(--color-danger)', fontWeight: 800, fontSize: '1.4rem' }}>SOS CONNECTING</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.5rem', lineHeight: '1.4' }}>
+                  Alerting emergency responders and dispatching location coordinates in {countdownTime} seconds.
+                </p>
+              </div>
+              <button 
+                className="btn btn-primary" 
+                onClick={cancelCountdown}
+                style={{ background: '#374151', color: 'white', width: '100%', marginTop: '1rem', padding: '0.75rem' }}
+              >
+                CANCEL TRIGGER
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live SOS Active Alert Panel */}
+      {sosTriggered && (
+        <div className="google-overlay sos-active-overlay" style={{ background: 'rgba(15,23,42,0.9)' }}>
+          <div className="google-modal glass-card" style={{ maxWidth: '420px', borderColor: 'var(--color-danger)', padding: '2rem 1.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--color-danger)', animation: 'pulse 0.6s infinite' }} />
+                <h3 style={{ color: 'var(--color-danger)', fontWeight: 900, margin: 0, fontSize: '1.4rem' }}>CRITICAL ALERT: SOS ACTIVE</h3>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '1rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>Transmitting Coordinates:</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.4rem', borderRadius: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>LATITUDE:</span>
+                    <span style={{ display: 'block', fontWeight: 'bold', color: 'var(--color-accent)' }}>{userCoordinates?.latitude.toFixed(6) || '37.774900'}</span>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.4rem', borderRadius: '4px' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>LONGITUDE:</span>
+                    <span style={{ display: 'block', fontWeight: 'bold', color: 'var(--color-accent)' }}>{userCoordinates?.longitude.toFixed(6) || '-122.419400'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                <p style={{ margin: '0 0 0.5rem 0' }}>🚨 <strong>Audible siren plays in browser</strong> via Web Audio API.</p>
+                <p style={{ margin: '0 0 0.5rem 0' }}>✉️ <strong>Simulated email notification dispatched</strong> to emergency contact <strong>{emergencyContact.name}</strong> ({emergencyContact.phone}).</p>
+              </div>
+
+              <button 
+                className="btn btn-primary" 
+                onClick={resetSOS}
+                style={{ background: 'var(--color-danger)', color: 'white', width: '100%', padding: '0.8rem', fontWeight: 'bold', border: 'none' }}
+              >
+                DEACTIVATE SIREN & SOS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .reminders-view {

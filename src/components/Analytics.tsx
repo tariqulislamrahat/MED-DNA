@@ -10,6 +10,7 @@ import {
 
 export const Analytics: React.FC = () => {
   const { medicines, adherenceRecords } = useMed();
+  const [selectedMedFilter, setSelectedMedFilter] = React.useState<string>('all');
 
   // 1. Generate last 7 days of data for the SVG bar chart
   const getWeeklyData = () => {
@@ -22,7 +23,11 @@ export const Analytics: React.FC = () => {
       const dateStr = d.toISOString().split('T')[0];
       
       // Calculate medicines active on that day
-      const activeOnDay = medicines.filter(m => new Date(dateStr) >= new Date(m.startDate));
+      let activeOnDay = medicines.filter(m => new Date(dateStr) >= new Date(m.startDate));
+      if (selectedMedFilter !== 'all') {
+        activeOnDay = activeOnDay.filter(m => m.id === selectedMedFilter);
+      }
+
       let totalDoses = 0;
       let takenDoses = 0;
 
@@ -63,7 +68,11 @@ export const Analytics: React.FC = () => {
       d.setDate(today.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       
-      const activeOnDay = medicines.filter(m => new Date(dateStr) >= new Date(m.startDate));
+      let activeOnDay = medicines.filter(m => new Date(dateStr) >= new Date(m.startDate));
+      if (selectedMedFilter !== 'all') {
+        activeOnDay = activeOnDay.filter(m => m.id === selectedMedFilter);
+      }
+
       let total = 0;
       let taken = 0;
 
@@ -96,11 +105,53 @@ export const Analytics: React.FC = () => {
 
   const monthlyCells = getMonthlyHeatmap();
 
+  const getMedComplianceRate = (medId: string) => {
+    let total = 0;
+    let taken = 0;
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const med = medicines.find(m => m.id === medId);
+      if (!med) continue;
+
+      if (new Date(dateStr) >= new Date(med.startDate)) {
+        med.timing.forEach(t => {
+          total++;
+          if (adherenceRecords[dateStr]?.[`${medId}_${t}`]?.taken) {
+            taken++;
+          }
+        });
+      }
+    }
+    return total > 0 ? Math.round((taken / total) * 100) : 100;
+  };
+
   return (
     <div className="analytics-view animate-fade-in">
-      <header className="view-header">
-        <h1>Adherence Analytics</h1>
-        <p>Inspect compliance stats, analyze weekday trends, and verify your 30-day health calendar.</p>
+      <header className="view-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div>
+          <h1>Adherence Analytics</h1>
+          <p>Inspect compliance stats, analyze weekday trends, and verify your 30-day health calendar.</p>
+        </div>
+        {medicines.length > 0 && (
+          <div className="filter-dropdown-container" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Filter:</span>
+            <select 
+              className="input-field" 
+              value={selectedMedFilter} 
+              onChange={(e) => setSelectedMedFilter(e.target.value)}
+              style={{ width: '200px', padding: '0.4rem 0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', outline: 'none', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600 }}
+            >
+              <option value="all">📊 All Medications</option>
+              {medicines.map(m => (
+                <option key={m.id} value={m.id}>💊 {m.name} ({m.dosage})</option>
+              ))}
+            </select>
+          </div>
+        )}
       </header>
 
       {/* Stats Summary Widgets */}
@@ -265,6 +316,46 @@ export const Analytics: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Individual Medicine Insights Section */}
+      {medicines.length > 0 && (
+        <div className="glass-card meds-insights-card" style={{ marginTop: '1.5rem', textAlign: 'left' }}>
+          <div className="chart-header" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+            <Award size={18} className="chart-icon" />
+            <h3>Individual Medication Insights</h3>
+          </div>
+          <p className="card-desc" style={{ marginBottom: '1.25rem' }}>Compliance rate calculated per medication across the last 30 days.</p>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {medicines.map((med) => {
+              const rate = getMedComplianceRate(med.id);
+              // Color based on rate
+              const rateColor = rate >= 90 ? 'var(--color-success)' : rate >= 75 ? '#eab308' : 'var(--color-danger)';
+              return (
+                <div key={med.id} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '1rem', background: 'rgba(255,255,255,0.015)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 'bold' }}>{med.name}</h4>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{med.dosage} • {med.duration}</span>
+                    </div>
+                    <span style={{ fontSize: '1.15rem', fontWeight: 900, color: rateColor }}>{rate}%</span>
+                  </div>
+                  
+                  {/* Progress bar container */}
+                  <div style={{ width: '100%', height: '6px', background: 'var(--border-color)', borderRadius: '3px', marginTop: '1rem', overflow: 'hidden' }}>
+                    <div style={{ width: `${rate}%`, height: '100%', background: rateColor, borderRadius: '3px', transition: 'width 0.6s ease' }} />
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.6rem' }}>
+                    <span>Refills: {med.refillsLeft}</span>
+                    <span>Starts: {med.startDate}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <style>{`
         .analytics-view {

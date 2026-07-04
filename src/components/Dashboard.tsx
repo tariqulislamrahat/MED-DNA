@@ -12,9 +12,9 @@ import {
   Sparkles,
   Pill,
   MapPin,
-  CalendarDays
+  CalendarDays,
+  RotateCcw
 } from 'lucide-react';
-import { MEDICINE_DATABASE } from '../services/mockData';
 
 interface DashboardProps {
   setCurrentTab: (tab: string) => void;
@@ -27,8 +27,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
     medicines, 
     adherenceRecords, 
     toggleDose, 
-    speakText
+    speakText,
+    interactionWarnings,
+    emailLogs,
+    fetchEmailLogs
   } = useMed();
+
+  React.useEffect(() => {
+    fetchEmailLogs();
+  }, []);
   
   const todayStr = new Date().toISOString().split('T')[0];
   const formattedDate = new Date().toLocaleDateString('en-US', {
@@ -72,26 +79,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
     evening: '🌆 Evening',
     night: '🌙 Night'
   };
-  
-  // Interaction check
-  const activeMedNames = medicines.map(m => m.name);
-  const interactionWarnings: { medA: string; medB: string; note: string }[] = [];
-  
-  for (let i = 0; i < activeMedNames.length; i++) {
-    for (let j = i + 1; j < activeMedNames.length; j++) {
-      const medA = activeMedNames[i];
-      const medB = activeMedNames[j];
-      
-      const infoA = MEDICINE_DATABASE[medA];
-      if (infoA && infoA.interactions.includes(medB)) {
-        interactionWarnings.push({
-          medA,
-          medB,
-          note: infoA.interactionNotes[medB] || `Interaction warning between ${medA} and ${medB}.`
-        });
-      }
-    }
-  }
 
   // SVG ring calculations
   const ringRadius = 54;
@@ -234,6 +221,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
             </div>
           )}
 
+          {/* Low Refill Alert */}
+          {medicines.filter(m => (m.refillsLeft || 0) <= 1).length > 0 && (
+            <div className="interaction-warning-card refill-warning-dashboard" style={{ borderColor: 'rgba(234, 179, 8, 0.4)', background: 'rgba(234, 179, 8, 0.05)', marginTop: '0.75rem' }}>
+              <div className="warning-card-header" style={{ color: '#eab308' }}>
+                <RotateCcw size={18} />
+                <span>Low Refills Alert ({medicines.filter(m => (m.refillsLeft || 0) <= 1).length})</span>
+              </div>
+              <p className="warning-body-text" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <span><strong>{medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].name}</strong> has only {medicines.filter(m => (m.refillsLeft || 0) <= 1)[0].refillsLeft} refills left. Click to request doctor refill.</span>
+                <button 
+                  className="btn btn-warning btn-xs" 
+                  onClick={() => setCurrentTab('meds')}
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', background: '#eab308', color: 'black', border: 'none', borderRadius: '3px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                >
+                  Manage Refills
+                </button>
+              </p>
+            </div>
+          )}
+
           {/* Stats summary cards */}
           <div className="dash-stat-cards-row">
             <div className="dash-stat-card">
@@ -250,6 +257,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
                 <span className="dash-stat-label">Refills Left</span>
               </div>
             </div>
+          </div>
+
+          {/* Simulated Email Reminders Dispatch Log */}
+          <div className="glass-card email-logs-card" style={{ marginTop: '1.25rem' }}>
+            <span className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}><Bell size={14} /> Simulated Email Dispatch Logs</span>
+            {emailLogs.length === 0 ? (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', padding: '0.5rem 0', textAlign: 'left' }}>No email logs retrieved from MongoDB yet today.</p>
+            ) : (
+              <div className="email-logs-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', maxHeight: '200px', overflowY: 'auto', textAlign: 'left' }}>
+                {emailLogs.slice(0, 3).map((log) => (
+                  <div key={log.id} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.6rem 0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--color-primary)' }}>To: {log.recipient}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginTop: '0.15rem' }}>{log.subject}</span>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

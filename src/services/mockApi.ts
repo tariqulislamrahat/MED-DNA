@@ -18,22 +18,15 @@ export const mockApi = {
   scanPrescription: async (input: string, userId: string = 'anonymous'): Promise<ScanResult> => {
     let payload: { image?: string; sampleId?: string; userId: string } = { userId };
     
-    // Check if input is a base64 data URL
+    // Check if input is a base64 data URL (real uploaded image)
     if (input.startsWith('data:image/')) {
       payload.image = input;
     } else {
-      // Let's create a fake base64 or pass sampleId so the backend can use Llama directly on the raw text
+      // It's a sample ID — the backend handles sample text injection directly
       payload.sampleId = input;
-      // To ensure OCR runs, we can pass a dummy base64 if needed, but we also support passing text directly.
-      // We will send the image base64 of the sample (by using a small fallback or letting backend know)
-      // For demo simplicity, if we don't have a file buffer, we send the raw handwriting as image/text
-      // Let's send a dummy tiny base64 image + the rawText to parse
-      payload.image = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
     }
 
     try {
-      // If we sent a sampleId, the server can call Llama directly on the handwriting text to save API quota,
-      // or run full Nemotron on the uploaded base64 image!
       const response = await fetch(`${API_BASE}/api/scan-prescription`, {
         method: 'POST',
         headers: {
@@ -43,7 +36,9 @@ export const mockApi = {
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned error: ${response.statusText}`);
+        const errorData = await response.json().catch(() => null);
+        const msg = errorData?.message || errorData?.error || response.statusText;
+        throw new Error(msg);
       }
 
       const result = await response.json();
@@ -54,9 +49,13 @@ export const mockApi = {
         date: result.date || new Date().toISOString().split('T')[0],
         extractedMeds: result.extractedMeds || []
       };
-    } catch (error) {
-      console.warn('API connection failed, falling back to local client parsing simulation:', error);
-      // Fallback to client simulation if backend is not running
+    } catch (error: any) {
+      console.warn('API connection failed:', error);
+      // If we uploaded a real image and it failed, throw so the UI shows the error
+      if (input.startsWith('data:image/')) {
+        throw new Error(error.message || 'Failed to scan prescription. Make sure the backend server is running.');
+      }
+      // For sample IDs, fall back to local data if server is unreachable
       const sample = SAMPLE_PRESCRIPTIONS.find(s => s.id === input) || SAMPLE_PRESCRIPTIONS[0];
       return {
         rawText: sample.rawHandwriting,
@@ -72,6 +71,14 @@ export const mockApi = {
    * Fetches detailed information for a medicine name
    */
   getMedicineInfo: async (name: string): Promise<MedicineInfo | null> => {
+    try {
+      const response = await fetch(`${API_BASE}/api/medicine-info?name=${encodeURIComponent(name)}`);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (e) {
+      console.warn('Backend medicine-info query failed, falling back to client dictionary:', e);
+    }
     // Case-insensitive local lookup
     const foundKey = Object.keys(MEDICINE_DATABASE).find(
       key => key.toLowerCase() === name.trim().toLowerCase()

@@ -11,7 +11,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  MessageSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,7 +37,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'meds', label: 'Medicine List', icon: Pill, badge: medicines.length > 0 ? medicines.length : undefined },
     { id: 'pharmacy', label: 'Find Pharmacy', icon: MapPin },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'reminders', label: 'Reminders & SOS', icon: BellRing }
+    { id: 'reminders', label: 'Reminders & SOS', icon: BellRing },
+    { id: 'aiguide', label: 'AI Health Guide', icon: MessageSquare }
   ];
 
   if (!user) return null;

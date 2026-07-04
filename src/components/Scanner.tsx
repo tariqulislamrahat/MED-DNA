@@ -8,29 +8,11 @@ import {
   Check, 
   X, 
   Plus, 
-  Trash2
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
 
-interface BoundingBox {
-  top: string;
-  left: string;
-  width: string;
-  height: string;
-  confidence: number;
-  label: string;
-}
 
-const SAMPLE_BOUNDING_BOXES: { [key: string]: BoundingBox[] } = {
-  'pres_01': [
-    { top: '23%', left: '10%', width: '80%', height: '11%', confidence: 99.2, label: 'Aspirin 81mg' },
-    { top: '39%', left: '10%', width: '82%', height: '11%', confidence: 98.4, label: 'Lisinopril 10mg' },
-    { top: '55%', left: '10%', width: '80%', height: '11%', confidence: 98.1, label: 'Atorvastatin 20mg' }
-  ],
-  'pres_02': [
-    { top: '23%', left: '10%', width: '82%', height: '11%', confidence: 99.4, label: 'Amoxicillin 500mg' },
-    { top: '39%', left: '10%', width: '85%', height: '11%', confidence: 98.8, label: 'Ibuprofen 400mg' }
-  ]
-};
 
 export const Scanner: React.FC = () => {
   const { 
@@ -38,35 +20,35 @@ export const Scanner: React.FC = () => {
     cancelScanning,
     isScanning, 
     scanResult, 
-    saveScannedMeds 
+    scanError,
+    setScanError,
+    saveScannedMeds,
+    medicines 
   } = useMed();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string>('');
   
-  // Hover linkage states
-  const [hoveredMedIndex, setHoveredMedIndex] = useState<number | null>(null);
-  
   // Real-time terminal simulator logs
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
   const consoleEndRef = React.useRef<HTMLDivElement>(null);
 
-  // Edited list of medicines from scan
-  const [editedMeds, setEditedMeds] = useState<Omit<ExtractedMedicine, 'id' | 'startDate'>[]>([]);
+  // Edited list of medicines from scan (with selection status)
+  const [editedMeds, setEditedMeds] = useState<(Omit<ExtractedMedicine, 'id' | 'startDate'> & { selected: boolean })[]>([]);
 
   // Update editor state when scan results arrive
   useEffect(() => {
     if (scanResult) {
-      setEditedMeds(
-        scanResult.extractedMeds.map(m => ({
-          name: m.name,
-          dosage: m.dosage,
-          timing: [...m.timing],
-          instructions: m.instructions,
-          duration: m.duration,
-          refillsLeft: m.refillsLeft
-        }))
-      );
+      const meds = scanResult.extractedMeds.map(m => ({
+        name: m.name,
+        dosage: m.dosage,
+        timing: [...m.timing],
+        instructions: m.instructions,
+        duration: m.duration,
+        refillsLeft: m.refillsLeft,
+        selected: true
+      }));
+      setEditedMeds(meds);
     }
   }, [scanResult]);
 
@@ -75,49 +57,32 @@ export const Scanner: React.FC = () => {
     if (isScanning) {
       setConsoleLogs([]);
       const logs = [
-        "[0.00s] INITIALIZING: Booting MedDNA OCR Neural Engine v3.4.1 (GPU acceleration active)...",
-        "[0.18s] PREPARATION: Pre-loading clinical FDA database matching maps...",
-        "[0.35s] IMAGE ANALYSIS: Analyzing contrast grid, de-skewing angle (+0.32° correction)...",
-        "[0.55s] CONTRAST CORRECTION: Normalizing luminance channels, sharpening script margins...",
-        "[0.72s] SEGMENTATION: Mapping handwritten script lines. Clinic header boundary detected.",
-        "[0.95s] RECOGNITION: Processing cursive doctor script against Caveat-v2 handwriting model...",
-        "[1.15s] EXTRACTING: Reading item 1 -> 'Aspirin 81mg' (Confidence rating: 99.2%)...",
-        "[1.32s] EXTRACTING: Reading item 2 -> 'Lisinopril 10mg' (Confidence rating: 98.4%)...",
-        "[1.50s] EXTRACTING: Reading item 3 -> 'Atorvastatin 20mg' (Confidence rating: 98.1%)...",
-        "[1.68s] SAFETY SHIELD: Cross-referencing active chemical profiles for interaction overlaps...",
-        "[1.80s] SCAN COMPLETE: 98.6% average interpretation accuracy confirmed."
+        "[0.00s] INITIALIZING: Connecting to MedDNA API service...",
+        "[0.30s] PREPARATION: Preparing image payload vectors...",
+        "[0.65s] UPLOAD: Sending image payload to Express server...",
+        "[1.10s] RUNNING OCR: Submitting image buffer to NVIDIA Nemotron-OCR-v2 NIM...",
+        "[2.15s] OCR ANALYSIS: Reading text shapes and characters (Confidence rating: 98.4%)...",
+        "[3.25s] RUNNING LLM: Submitting extracted text blocks to NVIDIA Llama-3.1-8b-Instruct...",
+        "[4.50s] LLM EXTRACTING: Parsing doctor signature, specialty, and medications...",
+        "[5.80s] COMPILING: Structuring clinical guidelines and timings...",
+        "[6.90s] MONGODB LOGGING: Committing prescription scan history to databases...",
+        "[7.80s] COMPLETE: Prescription scanned and parsed successfully!"
       ];
       
       let curIdx = 0;
       const interval = setInterval(() => {
         if (curIdx < logs.length) {
-          // If sample 2 selected, change the log list for sample 2
-          if (selectedSampleId === 'pres_02') {
-            const riveraLogs = [
-              "[0.00s] INITIALIZING: Booting MedDNA OCR Neural Engine v3.4.1 (GPU acceleration active)...",
-              "[0.18s] PREPARATION: Pre-loading clinical FDA database matching maps...",
-              "[0.35s] IMAGE ANALYSIS: Analyzing contrast grid, de-skewing angle (-0.12° correction)...",
-              "[0.55s] CONTRAST CORRECTION: Normalizing luminance channels, sharpening script margins...",
-              "[0.72s] SEGMENTATION: Mapping handwritten script lines. Clinic header boundary detected.",
-              "[0.95s] RECOGNITION: Processing cursive doctor script against Caveat-v2 handwriting model...",
-              "[1.15s] EXTRACTING: Reading item 1 -> 'Amoxicillin 500mg' (Confidence rating: 99.4%)...",
-              "[1.32s] EXTRACTING: Reading item 2 -> 'Ibuprofen 400mg' (Confidence rating: 98.8%)...",
-              "[1.55s] SAFETY SHIELD: Cross-referencing active chemical profiles for interaction overlaps...",
-              "[1.80s] SCAN COMPLETE: 99.1% average interpretation accuracy confirmed."
-            ];
-            setConsoleLogs(prev => [...prev, riveraLogs[curIdx]]);
-          } else {
-            setConsoleLogs(prev => [...prev, logs[curIdx]]);
-          }
+          const nextLog = logs[curIdx];
+          setConsoleLogs(prev => [...prev, nextLog]);
           curIdx++;
         } else {
           clearInterval(interval);
         }
-      }, 150);
+      }, 250);
 
       return () => clearInterval(interval);
     }
-  }, [isScanning, selectedSampleId]);
+  }, [isScanning]);
 
   // Autoscroll terminal
   useEffect(() => {
@@ -168,7 +133,8 @@ export const Scanner: React.FC = () => {
         timing: ['morning'],
         instructions: 'Take with water',
         duration: '7 days',
-        refillsLeft: 0
+        refillsLeft: 0,
+        selected: true
       }
     ]);
   };
@@ -177,7 +143,7 @@ export const Scanner: React.FC = () => {
     setEditedMeds(prev => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleUpdateMed = (index: number, key: keyof Omit<ExtractedMedicine, 'id' | 'startDate'>, value: any) => {
+  const handleUpdateMed = (index: number, key: string, value: any) => {
     setEditedMeds(prev => {
       const copy = [...prev];
       copy[index] = {
@@ -219,13 +185,27 @@ export const Scanner: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (editedMeds.length === 0) return;
-    saveScannedMeds(editedMeds);
+    const medsToImport = editedMeds.filter(m => m.selected);
+    if (medsToImport.length === 0) return;
+    // Map to remove selection status before importing
+    saveScannedMeds(medsToImport.map(({ selected, ...rest }) => rest));
     setSelectedFile(null);
     setSelectedSampleId('');
   };
 
-  const boxes = SAMPLE_BOUNDING_BOXES[selectedSampleId] || SAMPLE_BOUNDING_BOXES['pres_01'];
+  // Check if a medicine already exists in dashboard safely
+  const isDuplicate = (name?: string) => {
+    if (!name) return false;
+    return medicines.some(m => m.name && m.name.toLowerCase().trim() === name.toLowerCase().trim());
+  };
+
+  const toggleMedSelection = (idx: number) => {
+    handleUpdateMed(idx, 'selected', !editedMeds[idx].selected);
+  };
+
+  const selectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: true })));
+  const deselectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: false })));
+
   const sampleDoc = SAMPLE_PRESCRIPTIONS.find(s => s.id === selectedSampleId) || SAMPLE_PRESCRIPTIONS[0];
   const handwritingLines = sampleDoc.rawHandwriting.split('\n');
 
@@ -239,6 +219,21 @@ export const Scanner: React.FC = () => {
             <h1>Prescription OCR & AI Interpreter</h1>
             <p>Upload a photo, PDF, or choose from our handwriting demo scripts to test the AI extractor.</p>
           </header>
+
+          {scanError && (
+            <div className="glass-card animate-fade-in" style={{ display: 'flex', gap: '0.75rem', padding: '1rem', border: '1px solid rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.05)', color: 'var(--color-danger)', marginBottom: '1.5rem', borderRadius: 'var(--radius-sm)', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <AlertCircle size={20} />
+                <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{scanError}</span>
+              </div>
+              <button 
+                onClick={() => setScanError(null)} 
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
 
           <div className="scanner-split-layout">
             
@@ -340,7 +335,7 @@ export const Scanner: React.FC = () => {
                 <span className="console-title">MedDNA-OCR-ENGINE://terminal_logs</span>
               </div>
               <div className="console-output-area">
-                {consoleLogs.map((log, idx) => {
+                {consoleLogs.filter(Boolean).map((log, idx) => {
                   const isHighlight = log.includes("COMPLETE") || log.includes("ACCURACY") || log.includes("accuracy");
                   return (
                     <div key={idx} className={`console-log-line ${isHighlight ? 'highlight' : ''}`}>
@@ -359,245 +354,194 @@ export const Scanner: React.FC = () => {
         </div>
       )}
 
-      {/* 3. Review & Verification Screen (Interactive split screen bounding boxes) */}
+      {/* 3. Review & Verification Screen */}
       {!isScanning && scanResult && (
         <div className="review-container animate-fade-in">
           <header className="view-header">
             <div className="flex-title-row">
-              <h1>Verify Parsed Medications</h1>
+              <h1>Scan Results</h1>
               <span className="badge badge-success"><Sparkles size={12} /> AI Extraction Complete</span>
             </div>
-            <p>Hover over the prescription regions or the editor cards below to see matched coordinate blocks.</p>
+            <p>
+              Found <strong>{editedMeds.length}</strong> medicine{editedMeds.length !== 1 ? 's' : ''} in this prescription. 
+              Select which ones to import into your dashboard.
+            </p>
           </header>
 
-          <div className="review-split-layout">
-            
-            {/* Left: Custom Simulated Handwriting Prescription Paper or Custom Upload Preview */}
-            {selectedSampleId === 'custom' ? (
-              <div className="custom-presc-preview-card glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '420px', padding: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem' }}>Uploaded Prescription Document</h3>
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-                  <img src={selectedFile || ''} alt="Uploaded prescription" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                  <div className="scanner-laser-line" style={{ animation: 'laserScan 3s ease-in-out infinite' }} />
-                </div>
-                <div style={{ background: '#fcfcfc', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', maxHeight: '100px', overflowY: 'auto' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 'bold', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Extracted OCR Text snippet</span>
-                  <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.2rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                    {scanResult.rawText}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="clinical-presc-slip">
-                <div className="slip-header">
-                  <div className="slip-header-title">{sampleDoc.doctorName}</div>
-                  <div className="slip-header-sub">{sampleDoc.specialty}</div>
-                  <div className="slip-meta-row">
-                    <span>Patient Name: Alex Mercer</span>
-                    <span>Date: {sampleDoc.date}</span>
+          {/* Top: Image preview + OCR text side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: selectedFile || selectedSampleId === 'custom' ? '1fr 1fr' : '1fr', gap: '1.25rem', marginBottom: '1.5rem' }}>
+            {/* Image preview */}
+            {(selectedFile || selectedSampleId !== 'custom') && (
+              <div className="glass-card" style={{ padding: '1rem' }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <FileText size={14} /> Uploaded Document
+                </h3>
+                {selectedSampleId === 'custom' && selectedFile ? (
+                  <div style={{ background: '#f5f5f5', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-color)', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={selectedFile} alt="Uploaded prescription" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                   </div>
-                </div>
-                
-                <div className="slip-body">
-                  <div className="rx-symbol">Rx</div>
-                  <div className="handwritten-content">
-                    {handwritingLines.slice(2, selectedSampleId === 'pres_02' ? 4 : 5).map((line, idx) => (
-                      <div key={idx} className="handwritten-line">
-                        {line}
-                      </div>
-                    ))}
-                    <div className="handwritten-line" style={{ marginTop: '2rem', fontSize: '1.25rem', fontFamily: 'sans-serif', opacity: 0.6 }}>
-                      {handwritingLines[selectedSampleId === 'pres_02' ? 4 : 5]}
+                ) : (
+                  <div className="clinical-presc-slip" style={{ transform: 'scale(0.85)', transformOrigin: 'top left' }}>
+                    <div className="slip-header">
+                      <div className="slip-header-title">{scanResult.doctorName}</div>
+                      <div className="slip-header-sub">{scanResult.specialty}</div>
                     </div>
-                    <div className="handwritten-line" style={{ fontSize: '1.25rem', fontFamily: 'sans-serif', opacity: 0.6 }}>
-                      {handwritingLines[selectedSampleId === 'pres_02' ? 5 : 6]}
+                    <div className="slip-body" style={{ minHeight: '120px' }}>
+                      <div className="rx-symbol">Rx</div>
+                      <div className="handwritten-content">
+                        {handwritingLines.slice(2, 6).map((line, idx) => (
+                          <div key={idx} className="handwritten-line">{line}</div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Absolutely positioned glowing bounding boxes */}
-                  <div className="ocr-bounding-box-layer">
-                    {boxes.map((box, idx) => (
-                      <div 
-                        key={idx}
-                        className={`ocr-bounding-box ${hoveredMedIndex === idx ? 'active-hover' : ''}`}
-                        style={{ 
-                          top: box.top, 
-                          left: box.left, 
-                          width: box.width, 
-                          height: box.height 
-                        }}
-                        onMouseEnter={() => setHoveredMedIndex(idx)}
-                        onMouseLeave={() => setHoveredMedIndex(null)}
-                      >
-                        <div className="confidence-bubble">
-                          {box.confidence}% confident
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
             )}
+            
+            {/* OCR extracted text */}
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.75rem' }}>📝 Extracted OCR Text</h3>
+              <div style={{ background: 'rgba(0,0,0,0.02)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', maxHeight: '220px', overflowY: 'auto' }}>
+                <pre style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0, lineHeight: 1.5 }}>
+                  {scanResult.rawText || '(No raw text extracted)'}
+                </pre>
+              </div>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                Doctor: <strong>{scanResult.doctorName}</strong> • Specialty: {scanResult.specialty} • Date: {scanResult.date}
+              </div>
+            </div>
+          </div>
 
-            {/* Right: Editable list editor */}
-            <div className="glass-card meds-editor-card">
-              <div className="editor-card-header">
-                <h3>Structured Medication Rules</h3>
-                <button className="btn btn-secondary btn-xs" onClick={handleAddField}>
-                  <Plus size={14} /> Add Medicine
+          {/* Medicine List with checkboxes */}
+          <div className="glass-card" style={{ padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+                💊 Extracted Medicines ({editedMeds.length})
+              </h3>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button className="btn btn-secondary btn-xs" onClick={selectAllMeds} style={{ fontSize: '0.7rem' }}>Select All</button>
+                <button className="btn btn-secondary btn-xs" onClick={deselectAllMeds} style={{ fontSize: '0.7rem' }}>Deselect All</button>
+                <button className="btn btn-secondary btn-xs" onClick={handleAddField} style={{ fontSize: '0.7rem' }}>
+                  <Plus size={12} /> Add Manual
                 </button>
               </div>
+            </div>
 
-              <div className="meds-editor-list">
-                {editedMeds.map((med, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`med-edit-row ${hoveredMedIndex === idx ? 'active-row-hover' : ''}`}
-                    onMouseEnter={() => setHoveredMedIndex(idx)}
-                    onMouseLeave={() => setHoveredMedIndex(null)}
-                  >
-                    <div className="med-row-header">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <h4>Medication #{idx + 1}</h4>
-                        {boxes[idx] ? (
-                          <div className="confidence-editor-label" style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            fontSize: '0.7rem',
-                            color: 'var(--color-success)',
-                            background: 'var(--color-success-glow)',
-                            padding: '0.1rem 0.4rem',
-                            borderRadius: '4px',
-                            fontWeight: 600
-                          }}>
-                            <Sparkles size={10} />
-                            <span>{boxes[idx].confidence}% OCR Confidence</span>
+            {editedMeds.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                <p style={{ fontSize: '0.95rem', fontWeight: 600 }}>No medicines could be extracted from this document.</p>
+                <p style={{ fontSize: '0.8rem' }}>This might not be a prescription. You can add medicines manually using the button above.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {editedMeds.map((med, idx) => {
+                  const duplicate = isDuplicate(med.name);
+                  const isSelected = med.selected;
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        border: `1px solid ${duplicate ? 'rgba(234, 179, 8, 0.4)' : isSelected ? 'rgba(6, 182, 212, 0.3)' : 'var(--border-color)'}`,
+                        borderRadius: 'var(--radius-sm)', 
+                        padding: '1rem',
+                        background: duplicate ? 'rgba(234, 179, 8, 0.03)' : isSelected ? 'rgba(6, 182, 212, 0.02)' : 'transparent',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {/* Top row: checkbox + name + badges + delete */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => toggleMedSelection(idx)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--color-primary)' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>#{idx + 1} {med.name}</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-primary-glow)', padding: '0.1rem 0.5rem', borderRadius: '4px' }}>
+                              {med.dosage}
+                            </span>
+                            {duplicate && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#b45309', background: 'rgba(234, 179, 8, 0.15)', padding: '0.15rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                                <AlertCircle size={10} /> DUPLICATE — Already in Dashboard
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <div className="confidence-editor-label" style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            fontSize: '0.7rem',
-                            color: 'var(--color-primary)',
-                            background: 'var(--color-primary-glow)',
-                            padding: '0.1rem 0.4rem',
-                            borderRadius: '4px',
-                            fontWeight: 600
-                          }}>
-                            <Sparkles size={10} />
-                            <span>98.6% Extraction Match</span>
-                          </div>
-                        )}
+                        </div>
+                        <button onClick={() => handleRemoveField(idx)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.25rem' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      {/* Editable fields grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.68rem' }}>Name</label>
+                          <input type="text" className="input-field" value={med.name} onChange={(e) => handleUpdateMed(idx, 'name', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.68rem' }}>Dosage</label>
+                          <input type="text" className="input-field" value={med.dosage} onChange={(e) => handleUpdateMed(idx, 'dosage', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.68rem' }}>Duration</label>
+                          <input type="text" className="input-field" value={med.duration} onChange={(e) => handleUpdateMed(idx, 'duration', e.target.value)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                        </div>
+                        <div className="input-group" style={{ marginBottom: 0 }}>
+                          <label style={{ fontSize: '0.68rem' }}>Refills</label>
+                          <input type="number" className="input-field" value={med.refillsLeft} onChange={(e) => handleUpdateMed(idx, 'refillsLeft', parseInt(e.target.value) || 0)} style={{ padding: '0.35rem 0.5rem', fontSize: '0.8rem' }} />
+                        </div>
                       </div>
                       
-                      <button className="remove-med-row-btn" onClick={() => handleRemoveField(idx)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-
-                    <div className="edit-inputs-grid">
-                      {/* Name */}
-                      <div className="input-group">
-                        <label>Medicine Name</label>
-                        <input 
-                          type="text" 
-                          className="input-field" 
-                          value={med.name} 
-                          onChange={(e) => handleUpdateMed(idx, 'name', e.target.value)} 
-                        />
-                      </div>
-
-                      {/* Dosage */}
-                      <div className="input-group">
-                        <label>Dosage strength</label>
-                        <input 
-                          type="text" 
-                          className="input-field" 
-                          value={med.dosage} 
-                          onChange={(e) => handleUpdateMed(idx, 'dosage', e.target.value)} 
-                        />
-                      </div>
-
-                      {/* Duration */}
-                      <div className="input-group">
-                        <label>Duration (days)</label>
-                        <input 
-                          type="text" 
-                          className="input-field" 
-                          value={med.duration} 
-                          onChange={(e) => handleUpdateMed(idx, 'duration', e.target.value)} 
-                        />
-                      </div>
-
-                      {/* Refills */}
-                      <div className="input-group">
-                        <label>Refills Allowed</label>
-                        <input 
-                          type="number" 
-                          className="input-field" 
-                          value={med.refillsLeft} 
-                          onChange={(e) => handleUpdateMed(idx, 'refillsLeft', parseInt(e.target.value) || 0)} 
-                        />
-                      </div>
-                    </div>
-
-                    {/* Schedule slots */}
-                    <div className="timing-selector-group">
-                      <span className="timing-lbl">Daily Dosage Schedule:</span>
-                      <div className="timing-pills-row">
+                      {/* Timing pills */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>Schedule:</span>
                         {['morning', 'afternoon', 'evening', 'night'].map(time => {
-                          const isSelected = med.timing.includes(time);
+                          const active = med.timing.includes(time);
                           return (
-                            <button
-                              key={time}
-                              type="button"
-                              className={`timing-pill ${isSelected ? 'selected' : ''}`}
+                            <button 
+                              key={time} type="button"
+                              className={`timing-pill ${active ? 'selected' : ''}`}
                               onClick={() => handleToggleTiming(idx, time)}
+                              style={{ fontSize: '0.65rem', padding: '0.2rem 0.6rem' }}
                             >
                               {time.toUpperCase()}
                             </button>
                           );
                         })}
                       </div>
-                    </div>
 
-                    {/* Instructions */}
-                    <div className="input-group">
-                      <label>Additional Intake Directions</label>
-                      <input 
-                        type="text" 
-                        className="input-field" 
-                        value={med.instructions} 
-                        onChange={(e) => handleUpdateMed(idx, 'instructions', e.target.value)} 
-                      />
+                      {/* Instructions */}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <input type="text" className="input-field" value={med.instructions} onChange={(e) => handleUpdateMed(idx, 'instructions', e.target.value)} placeholder="Instructions..." style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem', width: '100%' }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+            )}
 
-                {editedMeds.length === 0 && (
-                  <div className="empty-editor-warning">
-                    <p>No medicines in the review list. Click 'Add Medicine' to insert a record.</p>
-                  </div>
+            {/* Footer actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <strong>{editedMeds.filter(m => m.selected).length}</strong> of {editedMeds.length} medicine{editedMeds.length !== 1 ? 's' : ''} selected for import
+                {editedMeds.some(m => m.selected && isDuplicate(m.name)) && (
+                  <span style={{ color: '#b45309', marginLeft: '0.75rem', fontWeight: 600 }}>⚠ Includes duplicates</span>
                 )}
               </div>
-
-              <div className="editor-actions-footer">
-                <button className="btn btn-secondary" onClick={cancelScanning}>
-                  Cancel
-                </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button className="btn btn-secondary" onClick={cancelScanning}>Cancel</button>
                 <button 
                   className="btn btn-primary" 
                   onClick={handleSave}
-                  disabled={editedMeds.length === 0}
+                  disabled={editedMeds.filter(m => m.selected).length === 0}
                 >
-                  <Check size={16} /> Import into Dashboard Timeline
+                  <Check size={16} /> Import {editedMeds.filter(m => m.selected).length} Medicine{editedMeds.filter(m => m.selected).length !== 1 ? 's' : ''} to Dashboard
                 </button>
               </div>
-
             </div>
-
           </div>
         </div>
       )}
