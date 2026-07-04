@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const Pharmacy: React.FC = () => {
-  const { medicines } = useMed();
+  const { medicines, checkoutRefills } = useMed();
   const [loading, setLoading] = useState(false);
   const [pharmacies, setPharmacies] = useState<(PharmacyType & { totalEstimatedPrice: number; availableCount: number })[]>([]);
   const [cheapestId, setCheapestId] = useState('');
@@ -42,6 +42,7 @@ export const Pharmacy: React.FC = () => {
 
   const handlePlaceOrder = (pharmacyName: string) => {
     setOrderedPharmacy(pharmacyName);
+    checkoutRefills();
     setOrderModalOpen(true);
   };
 

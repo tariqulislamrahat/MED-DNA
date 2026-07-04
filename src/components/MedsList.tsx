@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useMed } from '../context/MedContext';
-import { MEDICINE_DATABASE, type MedicineInfo } from '../services/mockData';
+import { type MedicineInfo } from '../services/mockData';
+import { mockApi } from '../services/mockApi';
 import { 
   Volume2, 
+  VolumeX,
   Trash2, 
   FileText, 
   AlertTriangle, 
@@ -15,54 +17,48 @@ import {
 } from 'lucide-react';
 
 export const MedsList: React.FC = () => {
-  const { medicines, removeMedicine, speakText } = useMed();
+  const { medicines, removeMedicine, speakText, stopSpeech, activeSpeechId, interactionWarnings, requestRefill } = useMed();
   const [selectedMedInfo, setSelectedMedInfo] = useState<MedicineInfo | null>(null);
+  const [loadingSafetyInfo, setLoadingSafetyInfo] = useState(false);
+  const [refillRequests, setRefillRequests] = useState<Record<string, 'idle' | 'pending' | 'success'>>({});
 
-  const handleOpenInfo = (medName: string) => {
-    // Find in clinical database (case insensitive)
-    const dbKey = Object.keys(MEDICINE_DATABASE).find(
-      key => key.toLowerCase() === medName.trim().toLowerCase()
-    );
-    
-    if (dbKey) {
-      setSelectedMedInfo(MEDICINE_DATABASE[dbKey]);
-    } else {
-      // Create fallback info if not in db
-      setSelectedMedInfo({
-        name: medName,
-        category: "General Medicine",
-        uses: ["Take as directed by your physician"],
-        sideEffects: ["Mild dizziness", "Stomach irritation"],
-        precautions: ["Store in a cool dry place", "Keep out of reach of children"],
-        interactions: [],
-        interactionNotes: {}
-      });
+  const handleRequestRefill = async (medId: string) => {
+    setRefillRequests(prev => ({ ...prev, [medId]: 'pending' }));
+    try {
+      await requestRefill(medId);
+      setRefillRequests(prev => ({ ...prev, [medId]: 'success' }));
+    } catch (e) {
+      setRefillRequests(prev => ({ ...prev, [medId]: 'idle' }));
+    }
+  };
+
+  const handleOpenInfo = async (medName: string) => {
+    setLoadingSafetyInfo(true);
+    try {
+      const info = await mockApi.getMedicineInfo(medName);
+      if (info) {
+        setSelectedMedInfo(info);
+      } else {
+        setSelectedMedInfo({
+          name: medName,
+          category: "General Medicine",
+          uses: ["Take as directed by your physician"],
+          sideEffects: ["Mild dizziness", "Stomach irritation"],
+          precautions: ["Store in a cool dry place", "Keep out of reach of children"],
+          interactions: [],
+          interactionNotes: {}
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load safety profile:', err);
+    } finally {
+      setLoadingSafetyInfo(false);
     }
   };
 
   const handleCloseInfo = () => {
     setSelectedMedInfo(null);
   };
-
-  // Evaluate overlapping interactions
-  const activeMedNames = medicines.map(m => m.name);
-  const interactionWarnings: { medA: string; medB: string; note: string }[] = [];
-
-  for (let i = 0; i < activeMedNames.length; i++) {
-    for (let j = i + 1; j < activeMedNames.length; j++) {
-      const medA = activeMedNames[i];
-      const medB = activeMedNames[j];
-      
-      const infoA = MEDICINE_DATABASE[medA];
-      if (infoA && infoA.interactions.includes(medB)) {
-        interactionWarnings.push({
-          medA,
-          medB,
-          note: infoA.interactionNotes[medB] || `Interaction warning between ${medA} and ${medB}.`
-        });
-      }
-    }
-  }
 
   return (
     <div className="meds-list-view animate-fade-in">
@@ -143,9 +139,31 @@ export const MedsList: React.FC = () => {
                       <Calendar size={14} />
                       <span>Duration: {med.duration}</span>
                     </div>
-                    <div className="detail-meta-item">
+                    <div className={`detail-meta-item ${med.refillsLeft <= 1 ? 'refill-alert' : ''}`} style={med.refillsLeft <= 1 ? { color: 'var(--color-danger)', fontWeight: 'bold' } : {}}>
                       <RotateCcw size={14} />
                       <span>Refills left: {med.refillsLeft}</span>
+                      {med.refillsLeft <= 1 && (
+                        <button
+                          className="btn btn-warning btn-xs refill-action-btn"
+                          onClick={() => handleRequestRefill(med.id)}
+                          disabled={refillRequests[med.id] === 'pending'}
+                          style={{
+                            marginLeft: '0.5rem',
+                            padding: '0.15rem 0.4rem',
+                            fontSize: '0.68rem',
+                            fontWeight: 'bold',
+                            background: refillRequests[med.id] === 'success' ? 'var(--color-success)' : 'var(--color-warning)',
+                            color: refillRequests[med.id] === 'success' ? 'white' : 'black',
+                            border: 'none',
+                            borderRadius: '3px',
+                            cursor: refillRequests[med.id] === 'pending' ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          {refillRequests[med.id] === 'pending' && 'Requesting...'}
+                          {refillRequests[med.id] === 'success' && 'Approved +3'}
+                          {(!refillRequests[med.id] || refillRequests[med.id] === 'idle') && 'Request Refill'}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -197,63 +215,102 @@ export const MedsList: React.FC = () => {
       )}
 
       {/* Slide-out Safety Info Drawer */}
-      {selectedMedInfo && (
+      {(selectedMedInfo || loadingSafetyInfo) && (
         <div className="drawer-overlay" onClick={handleCloseInfo}>
           <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
-            <div className="drawer-header">
-              <div>
-                <span className="drawer-category">{selectedMedInfo.category}</span>
-                <h2>{selectedMedInfo.name} Safety Profile</h2>
+            {loadingSafetyInfo ? (
+              <div className="drawer-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem', color: 'var(--text-secondary)' }}>
+                <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid var(--border-color)', borderTop: '3px solid var(--color-primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Querying Llama Safety Profiles...</p>
               </div>
-              <button className="close-drawer-btn" onClick={handleCloseInfo}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="drawer-body">
-              {/* Uses */}
-              <div className="drawer-section">
-                <h4>Primary Medical Uses</h4>
-                <ul>
-                  {selectedMedInfo.uses.map((use, idx) => (
-                    <li key={idx}>{use}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Side Effects */}
-              <div className="drawer-section">
-                <h4>Common Side Effects</h4>
-                <ul className="side-effects-list">
-                  {selectedMedInfo.sideEffects.map((effect, idx) => (
-                    <li key={idx} className="side-effect-item">{effect}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Precautions */}
-              <div className="drawer-section warning-section">
-                <h4>Clinical Precautions</h4>
-                <ul>
-                  {selectedMedInfo.precautions.map((prec, idx) => (
-                    <li key={idx}>{prec}</li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Interactions list */}
-              {selectedMedInfo.interactions.length > 0 && (
-                <div className="drawer-section danger-section">
-                  <h4>Documented Drug Conflicts</h4>
-                  <p className="interact-sub">Do not take with the following drugs:</p>
-                  <div className="drawer-interact-pills">
-                    {selectedMedInfo.interactions.map((interact, idx) => (
-                      <span key={idx} className="interact-badge">{interact}</span>
-                    ))}
+            ) : selectedMedInfo && (
+              <>
+                <div className="drawer-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                  <div>
+                    <span className="drawer-category">{selectedMedInfo.category}</span>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{selectedMedInfo.name} Safety Profile</h2>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    {activeSpeechId === selectedMedInfo.name ? (
+                      <div className="speech-active-container" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(6,182,212,0.08)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-full)' }}>
+                        <div className="audio-wave">
+                          <span className="bar"></span>
+                          <span className="bar"></span>
+                          <span className="bar"></span>
+                          <span className="bar"></span>
+                        </div>
+                        <button 
+                          className="btn btn-secondary btn-xs speech-btn" 
+                          onClick={stopSpeech}
+                          style={{ padding: '0.15rem 0.4rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem', height: '22px' }}
+                        >
+                          <VolumeX size={12} /> Stop
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        className="btn btn-primary btn-xs speech-btn" 
+                        onClick={() => speakText(
+                          `Safety Profile for ${selectedMedInfo.name}. Category: ${selectedMedInfo.category}. Primary uses: ${selectedMedInfo.uses.join('. ')}. Side effects: ${selectedMedInfo.sideEffects.join('. ')}. Precautions: ${selectedMedInfo.precautions.join('. ')}.`,
+                          selectedMedInfo.name
+                        )}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.2rem', height: '24px' }}
+                      >
+                        <Volume2 size={12} /> Listen Safely
+                      </button>
+                    )}
+                    <button className="close-drawer-btn" onClick={handleCloseInfo}>
+                      <X size={20} />
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+
+                <div className="drawer-body">
+                  {/* Uses */}
+                  <div className="drawer-section">
+                    <h4>Primary Medical Uses</h4>
+                    <ul>
+                      {selectedMedInfo.uses.map((use, idx) => (
+                        <li key={idx}>{use}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Side Effects */}
+                  <div className="drawer-section">
+                    <h4>Common Side Effects</h4>
+                    <ul className="side-effects-list">
+                      {selectedMedInfo.sideEffects.map((effect, idx) => (
+                        <li key={idx} className="side-effect-item">{effect}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Precautions */}
+                  <div className="drawer-section warning-section">
+                    <h4>Clinical Precautions</h4>
+                    <ul>
+                      {selectedMedInfo.precautions.map((prec, idx) => (
+                        <li key={idx}>{prec}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Interactions list */}
+                  {selectedMedInfo.interactions.length > 0 && (
+                    <div className="drawer-section danger-section">
+                      <h4>Documented Drug Conflicts</h4>
+                      <p className="interact-sub">Do not take with the following drugs:</p>
+                      <div className="drawer-interact-pills">
+                        {selectedMedInfo.interactions.map((interact, idx) => (
+                          <span key={idx} className="interact-badge">{interact}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -578,6 +635,37 @@ export const MedsList: React.FC = () => {
           padding: 0.2rem 0.6rem;
           border-radius: var(--radius-full);
           border: 1px solid rgba(244, 63, 94, 0.2);
+        }
+
+        /* Audio wave animation */
+        .audio-wave {
+          display: flex;
+          align-items: flex-end;
+          gap: 2.5px;
+          height: 14px;
+          padding: 0 2px;
+        }
+
+        .audio-wave .bar {
+          width: 3px;
+          background-color: var(--color-primary);
+          animation: wave-bounce 1s ease-in-out infinite alternate;
+          border-radius: 1px;
+          display: inline-block;
+        }
+
+        .audio-wave .bar:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+        .audio-wave .bar:nth-child(2) { height: 12px; animation-delay: 0.3s; }
+        .audio-wave .bar:nth-child(3) { height: 6px; animation-delay: 0.6s; }
+        .audio-wave .bar:nth-child(4) { height: 14px; animation-delay: 0.2s; }
+
+        @keyframes wave-bounce {
+          0% {
+            height: 4px;
+          }
+          100% {
+            height: 14px;
+          }
         }
       `}</style>
     </div>

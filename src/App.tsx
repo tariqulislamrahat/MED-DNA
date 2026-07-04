@@ -9,6 +9,7 @@ import { Tracker } from './components/Tracker';
 import { Pharmacy } from './components/Pharmacy';
 import { Analytics } from './components/Analytics';
 import { Reminders } from './components/Reminders';
+import { AiGuide } from './components/AiGuide';
 import { 
   LayoutDashboard, 
   ScanLine, 
@@ -58,6 +59,8 @@ function App() {
         return <Analytics />;
       case 'reminders':
         return <Reminders />;
+      case 'aiguide':
+        return <AiGuide />;
       default:
         return <Dashboard setCurrentTab={setCurrentTab} onOpenAddModal={() => setIsAddModalOpen(true)} />;
     }
