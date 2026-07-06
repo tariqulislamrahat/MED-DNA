@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, AlertCircle, RefreshCw } from 'lucide-react';
 import { useMed } from '../context/MedContext';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -58,7 +60,7 @@ export const AiGuide: React.FC = () => {
         content: m.content
       }));
 
-      const res = await fetch('/api/chat-guide', {
+      const res = await fetch(`${API_BASE}/api/chat-guide`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
