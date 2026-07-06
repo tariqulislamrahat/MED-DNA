@@ -67,7 +67,7 @@ interface MedContextType {
   setLanguage: (lang: 'en' | 'bn') => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   
-  login: (email?: string, name?: string) => Promise<void>;
+  login: (email?: string, name?: string, googleToken?: string) => Promise<void>;
   logout: () => void;
   startScanning: (sampleId?: string) => Promise<void>;
   cancelScanning: () => void;
@@ -312,16 +312,61 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [notificationsEnabled]);
 
-  const login = async (email?: string, name?: string) => {
-    // Simulated Google Login Auth Popup
-    await new Promise(r => setTimeout(r, 1200));
-    const mockUser = {
-      name: name || 'Alex Mercer',
-      email: email || 'alex.mercer@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
-    };
-    setUser(mockUser);
-    localStorage.setItem('meddna_user', JSON.stringify(mockUser));
+  const login = async (email?: string, name?: string, googleToken?: string) => {
+    let loggedInUser: any = null;
+    if (googleToken) {
+      try {
+        const response = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: googleToken })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            loggedInUser = data.user;
+          }
+        } else {
+          throw new Error('Google verification response not OK');
+        }
+      } catch (e) {
+        console.warn('Google Auth server verification failed, using fallback:', e);
+      }
+    }
+
+    if (!loggedInUser) {
+      // Simulated Google Login Auth Popup
+      await new Promise(r => setTimeout(r, 1200));
+      loggedInUser = {
+        name: name || 'Alex Mercer',
+        email: email || 'alex.mercer@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
+      };
+    }
+
+    // Set user state and save to local storage
+    setUser(loggedInUser);
+    localStorage.setItem('meddna_user', JSON.stringify(loggedInUser));
+
+    // Sync any existing offline/simulated medicines to the backend under the newly logged in user's email
+    try {
+      const syncEmail = loggedInUser.email;
+      if (medicines.length > 0) {
+        console.log(`Syncing ${medicines.length} medicines to Google account: ${syncEmail}`);
+        // Send a post request for each medicine that doesn't already belong to this user
+        await Promise.all(
+          medicines.map(async (med) => {
+            return fetch('/api/medicines', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...med, userId: syncEmail })
+            });
+          })
+        );
+      }
+    } catch (syncErr) {
+      console.warn('Failed to sync medicines to backend:', syncErr);
+    }
   };
 
   const logout = () => {

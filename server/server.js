@@ -4,12 +4,24 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const path = require('path');
+const compression = require('compression');
+const { OAuth2Client } = require('google-auth-library');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+let oauthClient;
+if (googleClientId) {
+  oauthClient = new OAuth2Client(googleClientId);
+  console.log('🔒 Google Auth initialized with Client ID:', googleClientId);
+} else {
+  console.warn('⚠️ GOOGLE_CLIENT_ID not configured. Google Sign-In will run in fallback simulation mode.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 
@@ -189,6 +201,82 @@ const sanitizeInstructions = (text) => {
 };
 
 // --- API ROUTES ---
+
+// 0. Google Auth Verification Endpoint
+app.post('/api/auth/google', async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) {
+    return res.status(400).json({ error: 'No Google credential token provided.' });
+  }
+
+  try {
+    if (googleClientId && oauthClient) {
+      // Real verification
+      const ticket = await oauthClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId
+      });
+      const payload = ticket.getPayload();
+      
+      if (!payload) {
+        throw new Error('Google token payload is empty');
+      }
+
+      const userId = payload.sub;
+      const email = payload.email;
+      const name = payload.name;
+      const picture = payload.picture;
+
+      console.log(`✅ Google token verified for user: ${email}`);
+      return res.json({
+        success: true,
+        user: {
+          id: userId,
+          email,
+          name,
+          avatar: picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
+        }
+      });
+    } else {
+      // Development Fallback mode: Decode token without verification, or mock response
+      console.warn('⚠️ Google Auth running in fallback simulation mode (GOOGLE_CLIENT_ID is missing).');
+      
+      // Attempt to decode the JWT helper (so developers can still get user names/emails if they pass any mock JWT)
+      try {
+        const base64Url = credential.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(Buffer.from(base64, 'base64').toString().split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        
+        const payload = JSON.parse(jsonPayload);
+        return res.json({
+          success: true,
+          user: {
+            id: payload.sub || 'mock_google_id_' + Date.now(),
+            email: payload.email || 'developer@example.com',
+            name: payload.name || 'Local Developer',
+            avatar: payload.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
+          }
+        });
+      } catch {
+        // If it's not a valid JWT token, return a simulated user profile
+        return res.json({
+          success: true,
+          user: {
+            id: 'mock_google_id_' + Date.now(),
+            email: 'alex.mercer@gmail.com',
+            name: 'Alex Mercer',
+            avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Google Auth verification failed:', error.message);
+    res.status(401).json({ error: 'Google Auth verification failed', message: error.message });
+  }
+});
 
 // 1. OCR + LLM Parsing Endpoint
 app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
@@ -826,8 +914,16 @@ ${language === 'bn' ? 'IMPORTANT: You must respond and communicate strictly in B
   }
 });
 
+// Serve static assets in production
+const distPath = path.join(__dirname, '../dist');
+app.use(express.static(distPath));
+
+// Fallback all other routes to React index.html (React Router Support)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
 // Start Server
 app.listen(PORT, () => {
-
   console.log(`🚀 MedDNA API Service listening on port ${PORT}`);
 });

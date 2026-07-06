@@ -48,10 +48,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
         {/* Logo */}
         <div className="sidebar-logo">
-          <div className="logo-mark">
-            <span className="logo-letter">M</span>
-          </div>
-          {!collapsed && <span className="logo-text">Med<span className="logo-accent">DNA</span></span>}
+          {collapsed ? (
+            /* Collapsed icon: just the red pill capsule */
+            <div className="sidebar-logo-capsule-only">
+              <span className="sidebar-capsule">
+                <span className="sidebar-char sidebar-char--white sidebar-char--flipped">D</span>
+                <span className="sidebar-char sidebar-char--white">D</span>
+              </span>
+            </div>
+          ) : (
+            /* Full Logo: ME [DD] NA */
+            <div className="sidebar-logo-full">
+              <span className="sidebar-char">M</span>
+              <span className="sidebar-char">E</span>
+              <span className="sidebar-capsule">
+                <span className="sidebar-char sidebar-char--white sidebar-char--flipped">D</span>
+                <span className="sidebar-char sidebar-char--white">D</span>
+              </span>
+              <span className="sidebar-char">N</span>
+              <span className="sidebar-char">A</span>
+            </div>
+          )}
         </div>
 
         {/* Collapse Toggle */}
@@ -137,38 +154,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
         .sidebar-logo {
           display: flex;
           align-items: center;
-          gap: 0.65rem;
-          padding: 0.25rem 0.75rem 1.5rem 0.75rem;
+          justify-content: center;
+          padding: 0.75rem 0.5rem 2rem 0.5rem;
+          min-height: 60px;
+          width: 100%;
         }
 
-        .logo-mark {
-          width: 34px;
-          height: 34px;
-          border-radius: var(--radius-sm);
-          background: var(--color-primary);
+        .sidebar-logo-full {
           display: flex;
           align-items: center;
           justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .logo-letter {
-          color: white;
-          font-family: var(--font-display);
+          font-family: var(--font-display), var(--font-sans), sans-serif;
+          font-size: 2.3rem;
           font-weight: 900;
-          font-size: 1.1rem;
+          letter-spacing: -0.04em;
+          user-select: none;
+          width: 100%;
         }
 
-        .logo-text {
-          font-family: var(--font-display);
-          font-weight: 800;
-          font-size: 1.3rem;
-          letter-spacing: -0.03em;
+        .sidebar-logo-capsule-only {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          font-size: 2.2rem;
+        }
+
+        .sidebar-char {
+          display: inline-block;
           color: var(--text-primary);
         }
 
-        .logo-accent {
-          color: var(--color-primary);
+        .sidebar-capsule {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--color-primary);
+          border-radius: 999px;
+          padding: 0 0.24em;
+          margin: 0 0.05em;
+          height: 1.15em;
+          box-shadow: 0 2px 8px var(--color-primary-glow);
+        }
+
+        .sidebar-capsule .sidebar-char {
+          font-size: 0.82em;
+          line-height: 1;
+        }
+
+        .sidebar-char--white {
+          color: #ffffff !important;
+        }
+
+        .sidebar-char--flipped {
+          transform: scaleX(-1);
+          margin-right: -0.02em;
+        }
+
+        .sidebar-capsule .sidebar-char:not(.sidebar-char--flipped) {
+          margin-left: -0.02em;
         }
 
         .collapse-toggle {

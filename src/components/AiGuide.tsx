@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { Send, AlertCircle, RefreshCw } from 'lucide-react';
 import { useMed } from '../context/MedContext';
 
 interface Message {
@@ -132,7 +132,10 @@ export const AiGuide: React.FC = () => {
         {/* Left column: active chat box */}
         <div className="glass-card chat-box-card">
           <div className="chat-header-banner">
-            <Sparkles size={16} className="sparkle-icon" />
+            <span className="ribbon-capsule">
+              <span className="ribbon-char ribbon-char--white ribbon-char--flipped">D</span>
+              <span className="ribbon-char ribbon-char--white">D</span>
+            </span>
             <span>{t('aiBanner')}</span>
           </div>
 
@@ -247,19 +250,49 @@ export const AiGuide: React.FC = () => {
         }
 
         .chat-header-banner {
-          background: rgba(6, 182, 212, 0.08);
+          background: rgba(229, 57, 53, 0.04);
           border-bottom: 1px solid var(--border-color);
           padding: 0.75rem 1.25rem;
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.65rem;
           font-size: 0.8rem;
           font-weight: 600;
-          color: var(--color-accent);
+          color: var(--text-primary);
         }
 
-        .sparkle-icon {
-          animation: pulse 1.5s infinite;
+        .ribbon-capsule {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--color-primary);
+          border-radius: 99px;
+          padding: 0 0.22em;
+          margin-right: 0.1em;
+          height: 1.25em;
+          font-family: var(--font-display), var(--font-sans), sans-serif;
+          font-size: 0.95rem;
+          font-weight: 900;
+          box-shadow: 0 2px 6px var(--color-primary-glow);
+        }
+
+        .ribbon-char {
+          display: inline-block;
+          font-size: 0.8em;
+          line-height: 1;
+        }
+
+        .ribbon-char--white {
+          color: #ffffff !important;
+        }
+
+        .ribbon-char--flipped {
+          transform: scaleX(-1);
+          margin-right: -0.02em;
+        }
+
+        .ribbon-capsule .ribbon-char:not(.ribbon-char--flipped) {
+          margin-left: -0.02em;
         }
 
         .chat-messages-area {
