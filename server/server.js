@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const compression = require('compression');
 const { OAuth2Client } = require('google-auth-library');
 
@@ -918,9 +919,14 @@ ${language === 'bn' ? 'IMPORTANT: You must respond and communicate strictly in B
 const distPath = path.join(__dirname, '../dist');
 app.use(express.static(distPath));
 
-// Fallback all other routes to React index.html (React Router Support)
+// Fallback all other routes to React index.html (React Router Support) or a clean API status check
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.json({ status: "online", service: "MED DNA API Service" });
+  }
 });
 
 // Start Server
