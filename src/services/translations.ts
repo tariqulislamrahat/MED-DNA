@@ -14,21 +14,21 @@ export const translations = {
     welcomeBack: "WELCOME BACK",
     
     // Login Screen
-    loginTitle: "MedDNA Patient Portal",
+    loginTitle: "MED DNA Patient Portal",
     loginTagline: "Your intelligent medical companion for prescription management, dose tracking, and pharmacy lookup.",
     aiOcrScanner: "AI OCR Scanner",
     smartReminders: "Smart Reminders",
     continueGoogle: "Continue with Google",
     termsNotice: "By signing in, you agree to our Terms of Service and Privacy Policy.",
     gSignInTitle: "Sign in with Google",
-    gSignInSub: "Choose an account to continue to MedDNA",
+    gSignInSub: "Choose an account to continue to MED DNA",
     gFullName: "Full Name",
     gEmailAddress: "Email Address",
     gBackToAccounts: "Back to Accounts",
     gSignInBtn: "Sign In",
     gUseAnother: "Use another Google Account",
     gCustomNotice: "Sign in with a custom name and email",
-    gFooter: "To continue, Google will share your name, email address, language preference, and profile picture with MedDNA.",
+    gFooter: "To continue, Google will share your name, email address, language preference, and profile picture with MED DNA.",
     gAuth: "Authenticating credentials...",
 
     // Dashboard
@@ -98,10 +98,10 @@ export const translations = {
 
     // AI Health Guide
     aiGuideHeader: "AI Health Assistant",
-    aiGuideSub: "Consult with MedDNA's specialized AI guide on drug dosages, warnings, and wellness recommendations.",
+    aiGuideSub: "Consult with MED DNA's specialized AI guide on drug dosages, warnings, and wellness recommendations.",
     clearChat: "Clear Chat",
-    aiBanner: "MedDNA AI Guide • Clinical Safety Filter Active",
-    aiGreeting: "Hello! I am your MedDNA AI Health Guide. I am programmed to assist you with medical queries, drug interactions, usage guidelines, safety profiles, and general health inquiries. Please note that I am strictly restricted to health and medicine topics.",
+    aiBanner: "MED DNA AI Guide • Clinical Safety Filter Active",
+    aiGreeting: "Hello! I am your MED DNA AI Health Guide. I am programmed to assist you with medical queries, drug interactions, usage guidelines, safety profiles, and general health inquiries. Please note that I am strictly restricted to health and medicine topics.",
     nonMedicalRestricted: "Non-medical topic restricted",
     chatPlaceholder: "Ask about side effects, safety guidelines, interactions...",
     quickSuggestions: "Quick Query Suggestions",
@@ -127,21 +127,21 @@ export const translations = {
     welcomeBack: "স্বাগতম",
     
     // Login Screen
-    loginTitle: "MedDNA পেশেন্ট পোর্টাল",
+    loginTitle: "MED DNA পেশেন্ট পোর্টাল",
     loginTagline: "প্রেসক্রিপশন ব্যবস্থাপনা, ডোজ ট্র্যাকিং এবং ফার্মেসী খোঁজার জন্য আপনার বুদ্ধিমান চিকিৎসা সহযোগী।",
     aiOcrScanner: "এআই ওসিআর স্ক্যানার",
     smartReminders: "স্মার্ট রিমাইন্ডার",
     continueGoogle: "গুগল দিয়ে চালিয়ে যান",
     termsNotice: "সাইন ইন করার মাধ্যমে, আপনি আমাদের পরিষেবার শর্তাবলী এবং গোপনীয়তা নীতিতে সম্মত হচ্ছেন।",
     gSignInTitle: "গুগল দিয়ে সাইন ইন করুন",
-    gSignInSub: "MedDNA-তে প্রবেশ করতে একটি অ্যাকাউন্ট নির্বাচন করুন",
+    gSignInSub: "MED DNA-তে প্রবেশ করতে একটি অ্যাকাউন্ট নির্বাচন করুন",
     gFullName: "পুরো নাম",
     gEmailAddress: "ইমেল ঠিকানা",
     gBackToAccounts: "অ্যাকাউন্টে ফিরে যান",
     gSignInBtn: "সাইন ইন করুন",
     gUseAnother: "অন্য একটি গুগল অ্যাকাউন্ট ব্যবহার করুন",
     gCustomNotice: "কাস্টম নাম এবং ইমেল দিয়ে সাইন ইন করুন",
-    gFooter: "চালিয়ে যেতে, গুগল আপনার নাম, ইমেল ঠিকানা, ভাষার পছন্দ এবং প্রোফাইল ছবি MedDNA-এর সাথে শেয়ার করবে।",
+    gFooter: "চালিয়ে যেতে, গুগল আপনার নাম, ইমেল ঠিকানা, ভাষার পছন্দ এবং প্রোফাইল ছবি MED DNA-এর সাথে শেয়ার করবে।",
     gAuth: "ক্রিডেনশিয়াল যাচাই করা হচ্ছে...",
 
     // Dashboard
@@ -211,10 +211,10 @@ export const translations = {
 
     // AI Health Guide
     aiGuideHeader: "এআই স্বাস্থ্য সহকারী",
-    aiGuideSub: "ওষুধের ডোজ, সতর্কতা এবং সুস্থতার সুপারিশের জন্য MedDNA-এর বিশেষায়িত এআই গাইডের সাথে পরামর্শ করুন।",
+    aiGuideSub: "ওষুধের ডোজ, সতর্কতা এবং সুস্থতার সুপারিশের জন্য MED DNA-এর বিশেষায়িত এআই গাইডের সাথে পরামর্শ করুন।",
     clearChat: "চ্যাট মুছুন",
-    aiBanner: "MedDNA এআই গাইড • ক্লিনিক্যাল নিরাপত্তা ফিল্টার সক্রিয়",
-    aiGreeting: "হ্যালো! আমি আপনার MedDNA এআই হেলথ গাইড। আমি আপনাকে ওষধি জিজ্ঞাসা, ওষুধের মিথস্ক্রিয়া, ব্যবহারের নির্দেশিকা, সুরক্ষা প্রোফাইল এবং সাধারণ স্বাস্থ্য জিজ্ঞাসায় সহায়তা করার জন্য প্রোগ্রামড। অনুগ্রহ করে মনে রাখবেন যে আমি কঠোরভাবে স্বাস্থ্য এবং চিকিৎসা বিষয়ক আলোচনার মধ্যেই সীমাবদ্ধ।",
+    aiBanner: "MED DNA এআই গাইড • ক্লিনিক্যাল নিরাপত্তা ফিল্টার সক্রিয়",
+    aiGreeting: "হ্যালো! আমি আপনার MED DNA এআই হেলথ গাইড। আমি আপনাকে ওষধি জিজ্ঞাসা, ওষুধের মিথস্ক্রিয়া, ব্যবহারের নির্দেশিকা, সুরক্ষা প্রোফাইল এবং সাধারণ স্বাস্থ্য জিজ্ঞাসায় সহায়তা করার জন্য প্রোগ্রামড। অনুগ্রহ করে মনে রাখবেন যে আমি কঠোরভাবে স্বাস্থ্য এবং চিকিৎসা বিষয়ক আলোচনার মধ্যেই সীমাবদ্ধ।",
     nonMedicalRestricted: "অ-চিকিৎসা বিষয়ক টপিক সীমাবদ্ধ করা হয়েছে",
     chatPlaceholder: "পার্শ্বপ্রতিক্রিয়া, নিরাপত্তা নির্দেশিকা, মিথস্ক্রিয়া সম্পর্কে জিজ্ঞাসা করুন...",
     quickSuggestions: "দ্রুত জিজ্ঞাসার পরামর্শ",

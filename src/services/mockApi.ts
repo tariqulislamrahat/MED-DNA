@@ -9,7 +9,7 @@ export interface ScanResult {
   extractedMeds: Omit<ExtractedMedicine, 'id' | 'startDate'>[];
 }
 
-const API_BASE = ''; // Rely on Vite proxy, or absolute http://localhost:5000 if not proxying
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export const mockApi = {
   /**

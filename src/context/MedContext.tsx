@@ -4,6 +4,8 @@ import { mockApi } from '../services/mockApi';
 import type { ScanResult } from '../services/mockApi';
 import { translations } from '../services/translations';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -67,7 +69,7 @@ interface MedContextType {
   setLanguage: (lang: 'en' | 'bn') => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
   
-  login: (email?: string, name?: string) => Promise<void>;
+  login: (email?: string, name?: string, googleToken?: string) => Promise<void>;
   logout: () => void;
   startScanning: (sampleId?: string) => Promise<void>;
   cancelScanning: () => void;
@@ -180,7 +182,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       try {
         const medNames = medicines.map(m => m.name);
-        const res = await fetch('/api/check-interactions', {
+        const res = await fetch(`${API_BASE}/api/check-interactions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ medicines: medNames })
@@ -312,16 +314,61 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [notificationsEnabled]);
 
-  const login = async (email?: string, name?: string) => {
-    // Simulated Google Login Auth Popup
-    await new Promise(r => setTimeout(r, 1200));
-    const mockUser = {
-      name: name || 'Alex Mercer',
-      email: email || 'alex.mercer@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
-    };
-    setUser(mockUser);
-    localStorage.setItem('meddna_user', JSON.stringify(mockUser));
+  const login = async (email?: string, name?: string, googleToken?: string) => {
+    let loggedInUser: any = null;
+    if (googleToken) {
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: googleToken })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            loggedInUser = data.user;
+          }
+        } else {
+          throw new Error('Google verification response not OK');
+        }
+      } catch (e) {
+        console.warn('Google Auth server verification failed, using fallback:', e);
+      }
+    }
+
+    if (!loggedInUser) {
+      // Simulated Google Login Auth Popup
+      await new Promise(r => setTimeout(r, 1200));
+      loggedInUser = {
+        name: name || 'Alex Mercer',
+        email: email || 'alex.mercer@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150&auto=format&fit=crop'
+      };
+    }
+
+    // Set user state and save to local storage
+    setUser(loggedInUser);
+    localStorage.setItem('meddna_user', JSON.stringify(loggedInUser));
+
+    // Sync any existing offline/simulated medicines to the backend under the newly logged in user's email
+    try {
+      const syncEmail = loggedInUser.email;
+      if (medicines.length > 0) {
+        console.log(`Syncing ${medicines.length} medicines to Google account: ${syncEmail}`);
+        // Send a post request for each medicine that doesn't already belong to this user
+        await Promise.all(
+          medicines.map(async (med) => {
+            return fetch(`${API_BASE}/api/medicines`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...med, userId: syncEmail })
+            });
+          })
+        );
+      }
+    } catch (syncErr) {
+      console.warn('Failed to sync medicines to backend:', syncErr);
+    }
   };
 
   const logout = () => {
@@ -365,7 +412,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     try {
       const savePromises = meds.map(med => 
-        fetch('/api/medicines', {
+        fetch(`${API_BASE}/api/medicines`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...med, userId: email })
@@ -382,7 +429,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Save scan history log to DB
         // The /api/scan-prescription endpoint already logs to the DB.
         // We can reload the prescriptions list from the API to get actual history.
-        const res = await fetch(`/api/prescriptions?userId=${email}`);
+        const res = await fetch(`${API_BASE}/api/prescriptions?userId=${email}`);
         if (res.ok) {
           const history = await res.json();
           setScanHistory(history.map((h: any) => ({
@@ -413,7 +460,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const email = user?.email || 'anonymous';
     
     try {
-      const response = await fetch('/api/medicines', {
+      const response = await fetch(`${API_BASE}/api/medicines`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...med, userId: email })
@@ -438,7 +485,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeMedicine = async (id: string) => {
     try {
-      const response = await fetch(`/api/medicines/${id}`, {
+      const response = await fetch(`${API_BASE}/api/medicines/${id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -454,7 +501,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteScanHistory = async (id: string) => {
     try {
-      const response = await fetch(`/api/prescriptions/${id}`, {
+      const response = await fetch(`${API_BASE}/api/prescriptions/${id}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -469,7 +516,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchEmailLogs = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/email-logs?userId=${user.email}`);
+      const res = await fetch(`${API_BASE}/api/email-logs?userId=${user.email}`);
       if (res.ok) {
         const logs = await res.json();
         setEmailLogs(logs);
@@ -487,7 +534,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedRefills = (med.refillsLeft || 0) + 3;
 
     try {
-      const response = await fetch('/api/medicines', {
+      const response = await fetch(`${API_BASE}/api/medicines`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -511,7 +558,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const updatePromises = medicines.map(med => {
         const nextRefills = Math.max(0, (med.refillsLeft || 0) - 1);
-        return fetch('/api/medicines', {
+        return fetch(`${API_BASE}/api/medicines`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -525,7 +572,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       // Reload medicines
       const email = user?.email || 'anonymous';
-      const medsRes = await fetch(`/api/medicines?userId=${email}`);
+      const medsRes = await fetch(`${API_BASE}/api/medicines?userId=${email}`);
       if (medsRes.ok) {
         const meds = await medsRes.json();
         setMedicines(meds);
@@ -540,7 +587,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const email = user?.email || 'anonymous';
     
     try {
-      const response = await fetch('/api/adherence/toggle', {
+      const response = await fetch(`${API_BASE}/api/adherence/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr, medId, timing, userId: email })
@@ -592,7 +639,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Dispatch emergency simulated email
     if (emailNotificationsEnabled && user) {
-      fetch('/api/send-email-reminder', {
+      fetch(`${API_BASE}/api/send-email-reminder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -746,7 +793,7 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           // 2. Dispatch simulated email alert
           if (emailNotificationsEnabled) {
-            fetch('/api/send-email-reminder', {
+            fetch(`${API_BASE}/api/send-email-reminder`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
