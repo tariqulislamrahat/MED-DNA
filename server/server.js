@@ -379,12 +379,14 @@ CRITICAL RULES:
 1. ONLY extract actual pharmaceutical medications (brand or generic drug names, e.g. "Lisinopril", "Amoxicillin", "Aspirin") in the "extractedMeds" list.
 2. DO NOT include clinical or hospital names, clinics, physical addresses, email addresses, websites, telephone/fax numbers, patient registration details, or doctor contact info anywhere in the "extractedMeds" array.
 3. The "name" field for each medicine MUST be ONLY the drug name (e.g., "Lisinopril", "Amoxicillin"). It must NEVER be a clinic name (e.g., "St. Jude Hospital", "Green City Clinic"), address, email, phone number, doctor name, signature line, or header. If a block of text does not represent a real pharmaceutical drug or medicine name, DO NOT include it in the "extractedMeds" array.
-4. The "dosage" field MUST contain only the strength or dosing unit (e.g., "10mg", "500mg", "1 tablet"). NEVER populate it with street addresses, phone numbers, email addresses, or clinic metadata.
-5. The "instructions" field MUST only contain directions for taking the drug (e.g., "Take 1 tablet daily before bed", "with meals"). NEVER include clinic operating hours, general disclaimers, address details, phone numbers, or pharmacy location details in instructions.
-6. The "timing" array MUST contain only one or more of: "morning", "afternoon", "evening", "night". Map Latin abbreviations (like QD, BID, TID, QID, QHS, 1-0-1, 1-1-1) to these slots correctly.
-7. If the document does NOT appear to be a prescription or has no medications, return an empty "extractedMeds" array and set "doctorName" to "Not a prescription document".
-8. Output ONLY a valid JSON object. No markdown formatting, no explanations.
-${language === 'bn' ? '9. IMPORTANT: Translate the "specialty", "instructions", and "duration" fields to Bangla (Bengali) language (e.g. translate "Take with food" to "খাবারের সাথে নিন", "7 days" to "৭ দিন"). Keep the "name" field in English or transliterated to Bangla, and keep "timing" values strictly in English.' : ''}
+4. Clean the medicine "name" field by stripping out prefixes like "Tab.", "Tab:", "Tab", "Capsule", "Caps", "Cap.", "Cap", "Syr.", "Syrup" so that only the clean, proper medicine name is returned (e.g., "Tab. Augmentin" becomes "Augmentin", "Tab PPanD" becomes "PPanD", "Tab: Enzoflam" becomes "Enzoflam", "Hexigel gum paint" becomes "Hexigel").
+5. The "dosage" field MUST contain only the strength or dosing unit (e.g., "10mg", "500mg", "1 tablet"). NEVER populate it with street addresses, phone numbers, email addresses, or clinic metadata.
+6. The "instructions" field MUST only contain directions for taking the drug (e.g., "Take 1 tablet daily before bed", "with meals"). NEVER include clinic operating hours, general disclaimers, address details, phone numbers, or pharmacy location details in instructions.
+7. The "timing" array MUST contain only one or more of: "morning", "afternoon", "evening", "night". Map Latin abbreviations (like QD, BID, TID, QID, QHS, 1-0-1, 1-1-1) to these slots correctly.
+8. Extract medications even if the document contains non-standard medical headers (such as dental clinic letters, dental implants, ophthalmic clinics, skin/dermatology plans). Do not mark the document as "Not a prescription document" if it contains lists of recognizable medicines or drug instructions.
+9. If there are absolutely no medications or doctor info present in the text, return an empty "extractedMeds" array and set "doctorName" to "Not a prescription document".
+10. Output ONLY a valid JSON object. No markdown formatting, no explanations.
+${language === 'bn' ? '11. IMPORTANT: Translate the "specialty", "instructions", and "duration" fields to Bangla (Bengali) language (e.g. translate "Take with food" to "খাবারের সাথে নিন", "7 days" to "৭ দিন"). Keep the "name" field in English or transliterated to Bangla, and keep "timing" values strictly in English.' : ''}
 
 JSON schema:
 {"doctorName":"string","specialty":"string","date":"YYYY-MM-DD","extractedMeds":[{"name":"string","dosage":"string","timing":["morning"],"instructions":"string","duration":"string","refillsLeft":0}]}`
