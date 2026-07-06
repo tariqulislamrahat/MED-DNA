@@ -29,6 +29,7 @@ export const Scanner: React.FC = () => {
   } = useMed();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFileMime, setSelectedFileMime] = useState<string | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string>('');
   
   // Real-time terminal simulator logs
@@ -60,13 +61,13 @@ export const Scanner: React.FC = () => {
       setConsoleLogs([]);
       const logs = [
         "[0.00s] INITIALIZING: Connecting to MedDNA API service...",
-        "[0.30s] PREPARATION: Preparing image payload vectors...",
-        "[0.65s] UPLOAD: Sending image payload to Express server...",
-        "[1.10s] RUNNING OCR: Submitting image buffer to NVIDIA Nemotron-OCR-v2 NIM...",
-        "[2.15s] OCR ANALYSIS: Reading text shapes and characters (Confidence rating: 98.4%)...",
-        "[3.25s] RUNNING LLM: Submitting extracted text blocks to NVIDIA Llama-3.1-8b-Instruct...",
-        "[4.50s] LLM EXTRACTING: Parsing doctor signature, specialty, and medications...",
-        "[5.80s] COMPILING: Structuring clinical guidelines and timings...",
+        "[0.30s] PREPARATION: Preparing document payload and metadata...",
+        "[0.65s] UPLOAD: Sending image/PDF payload to Express server...",
+        "[1.10s] OCR: Running PDF text-layer extraction or NVIDIA Nemotron-OCR-v2...",
+        "[2.15s] QUALITY: Scoring OCR density, medication signals, and confidence...",
+        "[3.25s] CANDIDATES: Inferring medicines, dose schedules, and meal context...",
+        "[4.50s] LLM: Parsing document context with NVIDIA Llama-3.3-70b-Instruct...",
+        "[5.80s] VALIDATION: Merging AI output with deterministic medicine candidates...",
         "[6.90s] MONGODB LOGGING: Committing prescription scan history to databases...",
         "[7.80s] COMPLETE: Prescription scanned and parsed successfully!"
       ];
@@ -98,6 +99,7 @@ export const Scanner: React.FC = () => {
     const sample = SAMPLE_PRESCRIPTIONS.find(s => s.id === id);
     if (sample) {
       setSelectedFile(sample.imageUrl);
+      setSelectedFileMime('image/jpeg');
     }
   };
 
@@ -108,6 +110,7 @@ export const Scanner: React.FC = () => {
       reader.onload = (event) => {
         if (event.target?.result) {
           setSelectedFile(event.target.result as string);
+          setSelectedFileMime(file.type || null);
           setSelectedSampleId('custom');
         }
       };
@@ -179,6 +182,7 @@ export const Scanner: React.FC = () => {
       reader.onload = (event) => {
         if (event.target?.result) {
           setSelectedFile(event.target.result as string);
+          setSelectedFileMime(file.type || null);
           setSelectedSampleId('custom');
         }
       };
@@ -192,6 +196,7 @@ export const Scanner: React.FC = () => {
     // Map to remove selection status before importing
     saveScannedMeds(medsToImport.map(({ selected, ...rest }) => rest));
     setSelectedFile(null);
+    setSelectedFileMime(null);
     setSelectedSampleId('');
   };
 
@@ -208,6 +213,7 @@ export const Scanner: React.FC = () => {
   const selectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: true })));
   const deselectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: false })));
 
+  const selectedIsPdf = selectedFileMime === 'application/pdf' || selectedFile?.startsWith('data:application/pdf');
   const sampleDoc = SAMPLE_PRESCRIPTIONS.find(s => s.id === selectedSampleId) || SAMPLE_PRESCRIPTIONS[0];
   const handwritingLines = sampleDoc.rawHandwriting.split('\n');
 

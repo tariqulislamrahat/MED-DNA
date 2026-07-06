@@ -17,6 +17,7 @@
     "express": "^5.2.1",
     "google-auth-library": "^9.15.0",
     "mongoose": "^9.7.3",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5"
   }
 }

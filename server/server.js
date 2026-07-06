@@ -7,8 +7,10 @@ const path = require('path');
 const fs = require('fs');
 const compression = require('compression');
 const { OAuth2Client } = require('google-auth-library');
+const pdfParse = require('pdf-parse');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env'), override: false });
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 let oauthClient;
@@ -21,14 +23,25 @@ if (googleClientId) {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '30mb';
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 25);
+const OCR_TIMEOUT_MS = Number(process.env.OCR_TIMEOUT_MS || 45000);
+const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 60000);
+const LLM_MODEL = process.env.NVIDIA_LLM_MODEL || 'meta/llama-3.3-70b-instruct';
+const ALLOWED_TIMINGS = ['morning', 'afternoon', 'evening', 'night'];
 
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: '15mb' }));
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // Multer setup for handling file uploads (optional, we support base64 json body as well)
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: MAX_UPLOAD_MB * 1024 * 1024
+  }
+});
 
 // Connect to MongoDB
 let isDbConnected = false;
@@ -68,8 +81,16 @@ const AdherenceSchema = new mongoose.Schema({
 const PrescriptionLogSchema = new mongoose.Schema({
   userId: { type: String, default: 'anonymous' },
   doctorName: String,
+  patientName: String,
   specialty: String,
   date: String,
+  documentType: String,
+  ocrEngine: String,
+  ocrConfidence: Number,
+  aiConfidence: Number,
+  quality: mongoose.Schema.Types.Mixed,
+  warnings: [String],
+  contextSummary: String,
   rawText: String,
   extractedMeds: Array,
   createdAt: { type: Date, default: Date.now }
@@ -201,6 +222,686 @@ const sanitizeInstructions = (text) => {
   return clean;
 };
 
+const clamp01 = (value) => Math.min(1, Math.max(0, Number(value) || 0));
+
+const normalizeWhitespace = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  return text
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const uniqueValues = (values) => [...new Set(values.filter(Boolean))];
+
+const fetchWithTimeout = async (url, options, timeoutMs) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const parseDataUrl = (dataUrl) => {
+  const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/i.exec(dataUrl || '');
+  if (!match) {
+    return {
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from(dataUrl || '', 'base64'),
+      dataUrl
+    };
+  }
+
+  const mimeType = (match[1] || 'application/octet-stream').toLowerCase();
+  const body = match[3] || '';
+  const buffer = match[2]
+    ? Buffer.from(body, 'base64')
+    : Buffer.from(decodeURIComponent(body), 'utf8');
+
+  return { mimeType, buffer, dataUrl };
+};
+
+const getUploadedDocument = (req) => {
+  const files = req.files
+    ? Object.values(req.files).flat()
+    : req.file
+      ? [req.file]
+      : [];
+  const uploaded = files.find(Boolean);
+
+  if (uploaded) {
+    return {
+      mimeType: (uploaded.mimetype || 'application/octet-stream').toLowerCase(),
+      filename: uploaded.originalname || 'upload',
+      size: uploaded.size || uploaded.buffer?.length || 0,
+      buffer: uploaded.buffer,
+      dataUrl: `data:${uploaded.mimetype || 'application/octet-stream'};base64,${uploaded.buffer.toString('base64')}`
+    };
+  }
+
+  const dataUrl = req.body.image || req.body.document || req.body.file;
+  if (!dataUrl) return null;
+
+  const parsed = parseDataUrl(dataUrl);
+  return {
+    ...parsed,
+    filename: req.body.filename || 'base64-upload',
+    size: parsed.buffer?.length || 0
+  };
+};
+
+const isPdfDocument = (documentInput) => {
+  if (!documentInput) return false;
+  if (documentInput.mimeType === 'application/pdf') return true;
+  if (documentInput.filename && /\.pdf$/i.test(documentInput.filename)) return true;
+  return documentInput.buffer?.slice(0, 4).toString('utf8') === '%PDF';
+};
+
+const extractPdfTextLayer = async (documentInput) => {
+  try {
+    const result = await pdfParse(documentInput.buffer);
+    const text = normalizeWhitespace(result?.text || '');
+    return {
+      text,
+      engine: 'pdf-text-layer',
+      pageCount: result?.numpages || 1,
+      confidences: text ? [0.92] : []
+    };
+  } catch (err) {
+    console.error('PDF text layer extraction failed:', err);
+    throw err;
+  }
+};
+
+const TEXT_KEYS = new Set([
+  'text',
+  'content',
+  'markdown',
+  'plain_text',
+  'ocr_text',
+  'detected_text',
+  'transcript',
+  'recognized_text',
+  'value'
+]);
+
+const CONFIDENCE_KEYS = new Set([
+  'confidence',
+  'score',
+  'probability',
+  'text_confidence',
+  'ocr_confidence'
+]);
+
+const collectOcrTextFragments = (value, fragments = [], seen = new WeakSet()) => {
+  if (!value || typeof value !== 'object') return fragments;
+  if (seen.has(value)) return fragments;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectOcrTextFragments(item, fragments, seen));
+    return fragments;
+  }
+
+  Object.entries(value).forEach(([key, child]) => {
+    const normalizedKey = key.toLowerCase();
+    if (typeof child === 'string' && TEXT_KEYS.has(normalizedKey)) {
+      const text = normalizeWhitespace(child);
+      if (text.length > 1) fragments.push(text);
+      return;
+    }
+
+    if (child && typeof child === 'object') {
+      collectOcrTextFragments(child, fragments, seen);
+    }
+  });
+
+  return fragments;
+};
+
+const collectOcrConfidences = (value, scores = [], seen = new WeakSet()) => {
+  if (!value || typeof value !== 'object') return scores;
+  if (seen.has(value)) return scores;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectOcrConfidences(item, scores, seen));
+    return scores;
+  }
+
+  Object.entries(value).forEach(([key, child]) => {
+    const normalizedKey = key.toLowerCase();
+    if (CONFIDENCE_KEYS.has(normalizedKey) && (typeof child === 'number' || typeof child === 'string')) {
+      const parsed = Number(child);
+      if (Number.isFinite(parsed)) {
+        scores.push(parsed > 1 ? clamp01(parsed / 100) : clamp01(parsed));
+      }
+      return;
+    }
+
+    if (child && typeof child === 'object') {
+      collectOcrConfidences(child, scores, seen);
+    }
+  });
+
+  return scores;
+};
+
+const dedupeFragments = (fragments) => {
+  const seen = new Set();
+  return fragments.filter((fragment) => {
+    const key = fragment.toLowerCase().replace(/\s+/g, ' ').slice(0, 500);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const extractTextFromOcrData = (ocrData) => {
+  const priorityFragments = [];
+
+  if (ocrData?.text) priorityFragments.push(ocrData.text);
+  if (ocrData?.predictions?.[0]?.text) priorityFragments.push(ocrData.predictions[0].text);
+  if (ocrData?.choices?.[0]?.message?.content) priorityFragments.push(ocrData.choices[0].message.content);
+  if (Array.isArray(ocrData?.data)) {
+    ocrData.data.forEach((entry) => {
+      const detections = entry?.text_detections || entry?.detections || [];
+      if (Array.isArray(detections)) {
+        priorityFragments.push(
+          detections
+            .map((detection) => detection?.text_prediction?.text || detection?.text || '')
+            .filter(Boolean)
+            .join(' ')
+        );
+      }
+    });
+  }
+
+  const genericFragments = collectOcrTextFragments(ocrData);
+  const text = normalizeWhitespace(dedupeFragments([...priorityFragments, ...genericFragments]).join('\n'));
+
+  return {
+    text,
+    confidences: collectOcrConfidences(ocrData)
+  };
+};
+
+const runNemotronOcr = async (documentInput) => {
+  if (!process.env.NVIDIA_OCR_KEY || process.env.NVIDIA_OCR_KEY.includes('your_')) {
+    throw new Error('NVIDIA_OCR_KEY is not configured on the server.');
+  }
+
+  const ocrResponse = await fetchWithTimeout('https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.NVIDIA_OCR_KEY}`
+    },
+    body: JSON.stringify({
+      input: [
+        {
+          type: 'image_url',
+          url: documentInput.dataUrl
+        }
+      ]
+    })
+  }, OCR_TIMEOUT_MS);
+
+  if (!ocrResponse.ok) {
+    const errText = await ocrResponse.text();
+    throw new Error(`NVIDIA OCR NIM failed: ${errText}`);
+  }
+
+  const ocrData = await ocrResponse.json();
+  const extracted = extractTextFromOcrData(ocrData);
+  return {
+    ...extracted,
+    engine: 'nvidia-nemotron-ocr-v2'
+  };
+};
+
+const computeOcrQuality = (rawText, confidences = [], sourceType = 'image') => {
+  const text = normalizeWhitespace(rawText);
+  const characterCount = text.length;
+  const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
+  const alphaNumericCount = (text.match(/[a-z0-9]/gi) || []).length;
+  const alphaNumericRatio = characterCount ? alphaNumericCount / characterCount : 0;
+  const medicationSignalCount = (text.match(/\b(?:rx|tab|tablet|cap|capsule|syr|inj|mg|mcg|ml|days?|weeks?|bd|bid|tid|tds|qid|qhs|od|1\s*[-/]\s*0\s*[-/]\s*1)\b/gi) || []).length;
+  const avgConfidence = confidences.length
+    ? confidences.reduce((sum, score) => sum + score, 0) / confidences.length
+    : Math.min(0.94, 0.35 + Math.min(characterCount / 1200, 0.35) + Math.min(medicationSignalCount / 12, 0.24));
+  const warnings = [];
+
+  if (characterCount < 40) warnings.push('Very little text was detected. Try a clearer, flatter image.');
+  if (alphaNumericRatio < 0.45 && characterCount > 0) warnings.push('OCR text contains heavy noise or handwriting artifacts.');
+  if (medicationSignalCount === 0) warnings.push('No strong medication shorthand was detected in OCR text.');
+  if (sourceType === 'pdf' && characterCount < 80) warnings.push('PDF text layer was sparse; scanned PDFs may require image OCR.');
+
+  return {
+    characterCount,
+    lineCount: lines.length,
+    medicationSignalCount,
+    confidence: Number((clamp01(avgConfidence) * 100).toFixed(1)),
+    likelyPrescription: medicationSignalCount > 0 || /\brx\b/i.test(text),
+    warnings
+  };
+};
+
+const detectDocumentType = (text, mimeType) => {
+  const clean = (text || '').toLowerCase();
+  if (/\b(rx|tab|tablet|cap|capsule|syr|inj|mg|mcg|ml|1\s*[-/]\s*0\s*[-/]\s*1)\b/.test(clean)) {
+    if (/\b(dental|dentist|teeth|gum|implant|oral)\b/.test(clean)) return 'dental prescription';
+    return 'prescription';
+  }
+  if (/\b(lab|laboratory|pathology|cbc|hemoglobin|glucose|cholesterol)\b/.test(clean)) return 'lab report';
+  if (mimeType === 'application/pdf') return 'medical document';
+  return 'image document';
+};
+
+const parseJsonObjectFromText = (content) => {
+  if (!content || typeof content !== 'string') {
+    throw new Error('LLM returned empty content.');
+  }
+
+  let cleaned = content
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(cleaned);
+    }
+    throw new Error('LLM output did not contain a valid JSON object.');
+  }
+};
+
+const buildPrescriptionParserPrompt = (language) => `You are MedDNA's clinical document intelligence engine. Extract structured data from OCR text with special attention to handwritten prescriptions.
+
+Rules:
+1. Extract only real medicines, drug brands, generics, formulations, gels, mouthwashes, drops, injections, or topical dental medicines into extractedMeds.
+2. Never put clinic names, doctor names, patient names, phone numbers, emails, websites, addresses, social handles, services, headers, signatures, or dates inside extractedMeds.
+3. Preserve uncertainty by using confidence values from 0 to 1 and short evidence snippets from the OCR text.
+4. Clean medicine names by removing prefixes like Tab, Tablet, Cap, Capsule, Syr, Inj, Drops, Adv, Rx. Remove dosage from name and place it in dosage.
+5. Parse schedules: 1-0-1 means morning and night; 1-0-0 morning; 0-1-0 afternoon; 0-0-1 night; 1-1-1 morning, afternoon, night; BID/BD twice daily; TID/TDS three times daily; QID four times daily; QHS/HS bedtime/night; OD daily.
+6. Meal context written beside a brace applies to the medicines grouped by that brace. Keep before meals/after meals in instructions.
+7. Dental prescriptions are valid prescriptions. Examples: Augmentin, Enzoflam, Pan-D, Hexigel gum paint.
+8. If no medicines are present, return an empty extractedMeds array and explain that in warnings.
+9. Output one valid JSON object only.
+${language === 'bn' ? '10. Translate specialty, contextSummary, instructions, duration, and warnings into Bengali. Keep medicine names in English or common transliteration and keep timing values in English.' : ''}
+
+Schema:
+{
+  "doctorName": "string",
+  "patientName": "string",
+  "specialty": "string",
+  "date": "YYYY-MM-DD",
+  "documentType": "string",
+  "contextSummary": "string",
+  "aiConfidence": 0.0,
+  "warnings": ["string"],
+  "extractedMeds": [
+    {
+      "name": "string",
+      "dosage": "string",
+      "timing": ["morning"],
+      "instructions": "string",
+      "duration": "string",
+      "refillsLeft": 0,
+      "confidence": 0.0,
+      "evidence": "short source snippet"
+    }
+  ]
+}`;
+
+const repairJsonWithLlm = async (badContent) => {
+  if (!process.env.NVIDIA_LLM_KEY || process.env.NVIDIA_LLM_KEY.includes('your_')) {
+    throw new Error('NVIDIA_LLM_KEY is not configured on the server.');
+  }
+
+  const response = await fetchWithTimeout('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.NVIDIA_LLM_KEY}`
+    },
+    body: JSON.stringify({
+      model: LLM_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: 'Repair the following response into one valid JSON object only. Do not add markdown or commentary.'
+        },
+        {
+          role: 'user',
+          content: badContent.slice(0, 6000)
+        }
+      ],
+      temperature: 0,
+      max_tokens: 2048
+    })
+  }, LLM_TIMEOUT_MS);
+
+  if (!response.ok) {
+    throw new Error(`JSON repair failed: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  return parseJsonObjectFromText(data.choices?.[0]?.message?.content || '');
+};
+
+const parsePrescriptionWithLlm = async ({ rawText, language, documentProfile, candidates }) => {
+  if (!process.env.NVIDIA_LLM_KEY || process.env.NVIDIA_LLM_KEY.includes('your_')) {
+    return {
+      parsed: {
+        doctorName: 'AI parsing unavailable',
+        specialty: 'Unknown',
+        date: new Date().toISOString().split('T')[0],
+        documentType: documentProfile.documentType,
+        contextSummary: 'LLM parsing skipped because NVIDIA_LLM_KEY is not configured.',
+        aiConfidence: 0,
+        warnings: ['NVIDIA_LLM_KEY is not configured on the server.'],
+        extractedMeds: []
+      },
+      llmWarning: 'NVIDIA_LLM_KEY is not configured on the server.'
+    };
+  }
+
+  const llmInput = JSON.stringify({
+    documentProfile,
+    deterministicMedicineCandidates: candidates.slice(0, 20),
+    rawOcrText: rawText.slice(0, 12000)
+  }, null, 2);
+
+  const response = await fetchWithTimeout('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.NVIDIA_LLM_KEY}`
+    },
+    body: JSON.stringify({
+      model: LLM_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: buildPrescriptionParserPrompt(language)
+        },
+        {
+          role: 'user',
+          content: llmInput
+        }
+      ],
+      temperature: 0.05,
+      max_tokens: 3072
+    })
+  }, LLM_TIMEOUT_MS);
+
+  if (!response.ok) {
+    throw new Error(`NVIDIA LLM failed: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || '';
+
+  try {
+    return { parsed: parseJsonObjectFromText(content) };
+  } catch (parseErr) {
+    console.warn('Initial LLM JSON parse failed, trying repair:', parseErr.message);
+    return { parsed: await repairJsonWithLlm(content) };
+  }
+};
+
+const normalizeMedicineName = (name) => {
+  if (!name || typeof name !== 'string') return '';
+  let clean = name
+    .replace(/\b(?:tab(?:let)?|cap(?:sule)?|syr(?:up)?|inj(?:ection)?|drops?|adv(?:ice)?|rx)\.?\s*[:.-]?\s*/ig, '')
+    .replace(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)\b/ig, '')
+    .replace(/\b(?:gum\s+paint|massage|before\s+meals?|after\s+meals?|with\s+meals?|x\s*\d+\s*(?:days?|weeks?|months?))\b/ig, '')
+    .replace(/\b(?:take|apply|tablet|capsule|daily|days?|weeks?|morning|afternoon|evening|night)\b/ig, '')
+    .replace(/[()[\]{}]/g, ' ')
+    .replace(/^[\s,.:;|/\\-]+|[\s,.:;|/\\-]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  clean = clean.replace(/\bpan\s*[- ]\s*d\b/i, 'Pan-D');
+  return clean;
+};
+
+const extractDosage = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  const match = text.match(/\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?|%)\b/i);
+  return match ? match[0].replace(/\s+/g, '') : '';
+};
+
+const inferDuration = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  const match = text.match(/\b(?:x|for|duration\s*:?)\s*(\d+\s*(?:days?|weeks?|months?))\b/i)
+    || text.match(/\b(\d+\s*(?:days?|weeks?|months?))\b/i);
+  return match ? match[1].replace(/\s+/g, ' ').trim() : '';
+};
+
+const normalizeTimings = (timing, evidenceText = '') => {
+  const existing = Array.isArray(timing)
+    ? timing.map((item) => String(item).toLowerCase()).filter((item) => ALLOWED_TIMINGS.includes(item))
+    : [];
+  const text = String(evidenceText || '').toLowerCase();
+  const inferred = new Set();
+
+  if (/\b1\s*[-/]\s*0\s*[-/]\s*1\b/.test(text)) {
+    inferred.add('morning');
+    inferred.add('night');
+  }
+  if (/\b1\s*[-/]\s*0\s*[-/]\s*0\b/.test(text)) inferred.add('morning');
+  if (/\b0\s*[-/]\s*1\s*[-/]\s*0\b/.test(text)) inferred.add('afternoon');
+  if (/\b0\s*[-/]\s*0\s*[-/]\s*1\b/.test(text)) inferred.add('night');
+  if (/\b1\s*[-/]\s*1\s*[-/]\s*1\b/.test(text) || /\b(?:tid|tds|three times|thrice)\b/.test(text)) {
+    inferred.add('morning');
+    inferred.add('afternoon');
+    inferred.add('night');
+  }
+  if (/\b(?:bid|bd|twice)\b/.test(text)) {
+    inferred.add('morning');
+    inferred.add('night');
+  }
+  if (/\b(?:qid|qds|four times)\b/.test(text)) {
+    ALLOWED_TIMINGS.forEach((slot) => inferred.add(slot));
+  }
+  if (/\b(?:qhs|hs|bedtime|night)\b/.test(text)) inferred.add('night');
+  if (/\b(?:morning|breakfast|qam|am)\b/.test(text)) inferred.add('morning');
+  if (/\b(?:afternoon|lunch|noon)\b/.test(text)) inferred.add('afternoon');
+  if (/\b(?:evening|dinner|supper|pm)\b/.test(text)) inferred.add('evening');
+
+  const normalized = uniqueValues([...existing, ...inferred])
+    .filter((slot) => ALLOWED_TIMINGS.includes(slot))
+    .slice(0, 4);
+
+  return normalized.length ? normalized : ['morning'];
+};
+
+const inferInstructions = (text, medicineName = '') => {
+  const source = `${text || ''} ${medicineName || ''}`.toLowerCase();
+  const instructions = [];
+
+  if (/\bafter\s+meals?\b/.test(source)) instructions.push('after meals');
+  if (/\bbefore\s+meals?\b/.test(source)) instructions.push('before meals');
+  if (/\bwith\s+(?:food|meals?)\b/.test(source)) instructions.push('with food');
+  if (/\b(?:prn|sos|as needed)\b/.test(source)) instructions.push('as needed');
+  if (/\b(?:gum\s+paint|hexigel|massage)\b/.test(source)) instructions.push('apply to gums and gently massage');
+
+  return uniqueValues(instructions).join('; ') || 'Take as directed';
+};
+
+const isLikelyMedicineName = (name) => {
+  const clean = normalizeMedicineName(name).toLowerCase();
+  if (!clean || isNonMedicine(clean)) return false;
+  if (!/[a-z]/i.test(clean)) return false;
+  if (/^(rx|adv|advice|date|patient|name|age|male|female|signature|sign|web|email)$/i.test(clean)) return false;
+  if (/\b(?:smile|designing|whitening|implant|dentistry|clinic|hospital|doctor|dentist|meals?|days?|weeks?|phone|mobile)\b/i.test(clean)) return false;
+  return clean.split(/\s+/).length <= 5;
+};
+
+const parseMedicineTail = (tail, sourceLine, inheritedContext = '') => {
+  const cleanTail = normalizeWhitespace(tail);
+  if (!cleanTail) return null;
+
+  const dosage = extractDosage(cleanTail);
+  const dosageIndex = dosage ? cleanTail.toLowerCase().indexOf(dosage.toLowerCase()) : -1;
+  let namePart = dosageIndex > 0 ? cleanTail.slice(0, dosageIndex) : cleanTail;
+  const stopIndex = namePart.search(/\b(?:\d+\s*[-/]\s*\d|x\s*\d|for\s+\d|after|before|with|daily|od|bd|bid|tid|tds|qid|qhs|sos|prn)\b/i);
+  if (stopIndex > 0) namePart = namePart.slice(0, stopIndex);
+
+  const name = normalizeMedicineName(namePart);
+  if (!isLikelyMedicineName(name)) return null;
+
+  const evidence = normalizeWhitespace(`${inheritedContext} ${sourceLine}`);
+  const topicalDosage = /\b(?:gum\s+paint|gel|cream|ointment|mouthwash)\b/i.test(cleanTail)
+    ? (cleanTail.match(/\b(?:gum\s+paint|gel|cream|ointment|mouthwash)\b/i)?.[0] || '')
+    : '';
+
+  return {
+    name,
+    dosage: dosage || topicalDosage || 'As directed',
+    timing: normalizeTimings([], evidence),
+    instructions: inferInstructions(evidence, name),
+    duration: inferDuration(evidence) || 'As directed',
+    refillsLeft: 0,
+    confidence: 0.72,
+    evidence,
+    source: 'heuristic'
+  };
+};
+
+const extractHeuristicMedicines = (rawText) => {
+  const normalized = normalizeWhitespace(rawText)
+    .replace(/[|;]/g, '\n')
+    .replace(/\b(?=(?:Tab|Tablet|Cap|Capsule|Syr|Syrup|Inj|Injection|Drops|Gel|Cream|Ointment|Mouthwash|Adv)\.?\s)/gi, '\n');
+  const lines = normalized.split('\n').map((line) => line.trim()).filter(Boolean);
+  const meds = [];
+  let mealContext = '';
+
+  lines.forEach((line) => {
+    if (/\bafter\s+meals?\b/i.test(line)) mealContext = 'after meals';
+    if (/\bbefore\s+meals?\b/i.test(line)) mealContext = 'before meals';
+
+    const formMatch = line.match(/\b(?:tab(?:let)?|cap(?:sule)?|syr(?:up)?|inj(?:ection)?|drops?|gel|cream|ointment|mouthwash)\.?\s*[:.-]?\s*(.+)$/i);
+    if (formMatch) {
+      const parsed = parseMedicineTail(formMatch[1], line, mealContext);
+      if (parsed) meds.push(parsed);
+    }
+
+    const topicalMatch = line.match(/\b(?:adv(?:ice)?\.?\s*[:.-]?\s*)?([A-Z][A-Za-z0-9-]{2,})\s+(gum\s+paint|mouthwash|gel|cream|ointment)\b/i);
+    if (topicalMatch) {
+      const parsed = parseMedicineTail(`${topicalMatch[1]} ${topicalMatch[2]}`, line, mealContext);
+      if (parsed) meds.push(parsed);
+    }
+  });
+
+  const byName = new Map();
+  meds.forEach((med) => {
+    const key = med.name.toLowerCase();
+    if (!byName.has(key)) byName.set(key, med);
+  });
+  return [...byName.values()];
+};
+
+const normalizeMedicineRecord = (med) => {
+  if (!med || !med.name) return null;
+  const evidence = normalizeWhitespace([med.evidence, med.sourceLine, med.instructions, med.duration, med.dosage].filter(Boolean).join(' '));
+  let name = normalizeMedicineName(med.name);
+  const dosageFromName = extractDosage(med.name);
+
+  if (!isLikelyMedicineName(name)) return null;
+
+  let dosage = med.dosage || dosageFromName || extractDosage(evidence) || 'As directed';
+  if (isNonMedicine(dosage)) dosage = 'As directed';
+  dosage = String(dosage).replace(/\s+/g, '').replace(/^Asdirected$/i, 'As directed');
+
+  const duration = med.duration && !isNonMedicine(med.duration)
+    ? med.duration
+    : inferDuration(evidence) || 'As directed';
+  const instructions = sanitizeInstructions(
+    med.instructions && med.instructions !== 'Take as directed'
+      ? med.instructions
+      : inferInstructions(evidence, name)
+  );
+
+  return {
+    name,
+    dosage,
+    timing: normalizeTimings(med.timing, evidence),
+    instructions,
+    duration,
+    refillsLeft: typeof med.refillsLeft === 'number' ? med.refillsLeft : 0,
+    confidence: typeof med.confidence === 'number' ? clamp01(med.confidence) : undefined,
+    evidence: med.evidence || med.sourceLine || undefined
+  };
+};
+
+const mergeMedicineLists = (llmMeds = [], heuristicMeds = []) => {
+  const merged = new Map();
+
+  [...llmMeds, ...heuristicMeds].forEach((med) => {
+    const normalized = normalizeMedicineRecord(med);
+    if (!normalized) return;
+
+    const key = normalized.name.toLowerCase();
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, normalized);
+      return;
+    }
+
+    merged.set(key, {
+      ...existing,
+      dosage: existing.dosage === 'As directed' ? normalized.dosage : existing.dosage,
+      instructions: existing.instructions === 'Take as directed' ? normalized.instructions : existing.instructions,
+      duration: existing.duration === 'As directed' ? normalized.duration : existing.duration,
+      timing: uniqueValues([...existing.timing, ...normalized.timing]).filter((slot) => ALLOWED_TIMINGS.includes(slot)),
+      confidence: Math.max(existing.confidence || 0, normalized.confidence || 0) || undefined,
+      evidence: existing.evidence || normalized.evidence
+    });
+  });
+
+  return [...merged.values()].map((med) => {
+    const { evidence, confidence, ...clientMed } = med;
+    return {
+      ...clientMed,
+      confidence
+    };
+  });
+};
+
+const buildSampleRawText = (sampleId) => {
+  if (sampleId === 'pres_01') {
+    return "Dr. Sarah Jenkins, MD\nCardiology Specialty\nDate: 2026-06-28\nRx:\n- Lisinopril 10mg: Take 1 tablet by mouth daily in the evening. Duration: 30 days. Refills: 3.\n- Atorvastatin 20mg: Take 1 tablet by mouth daily at bedtime. Duration: 30 days. Refills: 3.\n- Aspirin 81mg: Take 1 tablet daily. Duration: 30 days. Refills: 3.";
+  }
+  if (sampleId === 'pres_02') {
+    return "Dr. Manuel Rivera, MD\nPediatrics Specialty\nDate: 2026-07-02\nRx:\n- Amoxicillin 500mg: Take 1 capsule three times daily for 10 days. Refills: 0.\n- Ibuprofen 400mg: Take 1 tablet every 6 hours as needed for fever/pain. Duration: 5 days. Refills: 0.";
+  }
+  return '';
+};
+
+const buildFallbackParsedResult = ({ rawText, language, documentType, warnings = [] }) => ({
+  doctorName: /dr\.?\s+[a-z .]+/i.exec(rawText)?.[0] || 'Unknown Doctor',
+  patientName: '',
+  specialty: documentType === 'dental prescription' ? (language === 'bn' ? 'Dental' : 'Dentistry') : 'General',
+  date: new Date().toISOString().split('T')[0],
+  documentType,
+  contextSummary: warnings.length ? warnings.join(' ') : 'Parsed with deterministic OCR fallback.',
+  aiConfidence: 0.45,
+  warnings,
+  extractedMeds: []
+});
+
 // --- API ROUTES ---
 
 // 0. Google Auth Verification Endpoint
@@ -279,8 +980,179 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
-// 1. OCR + LLM Parsing Endpoint
-app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
+// 1. OCR + document-intelligence parsing endpoint
+const prescriptionUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'document', maxCount: 1 },
+  { name: 'file', maxCount: 1 }
+]);
+
+app.post('/api/scan-prescription', prescriptionUpload, async (req, res) => {
+  try {
+    const sampleId = req.body.sampleId;
+    const language = req.body.language || 'en';
+    const warnings = [];
+    let rawText = '';
+    let ocrEngine = 'sample-direct';
+    let documentInput = null;
+    let quality = null;
+
+    if (sampleId && (sampleId === 'pres_01' || sampleId === 'pres_02')) {
+      console.log(`Processing sample ${sampleId} with document intelligence parser...`);
+      rawText = buildSampleRawText(sampleId);
+      quality = computeOcrQuality(rawText, [0.99], 'sample');
+    } else {
+      documentInput = getUploadedDocument(req);
+      if (!documentInput) {
+        return res.status(400).json({ error: 'No prescription image or document provided.' });
+      }
+
+      console.log(`Scanning ${documentInput.mimeType} document (${documentInput.size} bytes)...`);
+
+      if (isPdfDocument(documentInput)) {
+        try {
+          const pdfText = await extractPdfTextLayer(documentInput);
+          if (pdfText.text.length >= 80) {
+            rawText = pdfText.text;
+            ocrEngine = pdfText.engine;
+            quality = computeOcrQuality(rawText, pdfText.confidences, 'pdf');
+          } else {
+            warnings.push('PDF text layer was too sparse; falling back to OCR.');
+          }
+        } catch (pdfErr) {
+          console.warn('PDF text extraction failed, falling back to OCR:', pdfErr.message);
+          warnings.push('PDF text extraction failed; falling back to OCR.');
+        }
+      }
+
+      if (!rawText) {
+        console.log('Sending document payload to NVIDIA Nemotron-OCR-v2...');
+        const ocrResult = await runNemotronOcr(documentInput);
+        rawText = ocrResult.text;
+        ocrEngine = ocrResult.engine;
+        quality = computeOcrQuality(rawText, ocrResult.confidences, isPdfDocument(documentInput) ? 'pdf' : 'image');
+      }
+
+      if (!rawText || rawText.trim().length === 0) {
+        return res.status(422).json({
+          error: 'OCR could not extract any text from the uploaded document. Please upload a clearer image or a PDF with readable text.',
+          rawText: ''
+        });
+      }
+    }
+
+    rawText = normalizeWhitespace(rawText);
+    const heuristicCandidates = extractHeuristicMedicines(rawText);
+    const documentType = detectDocumentType(rawText, documentInput?.mimeType);
+    quality = quality || computeOcrQuality(rawText, [], documentInput?.mimeType === 'application/pdf' ? 'pdf' : 'image');
+    quality.warnings = uniqueValues([...(quality.warnings || []), ...warnings]);
+
+    console.log(`OCR complete via ${ocrEngine}. chars=${rawText.length}, candidates=${heuristicCandidates.length}`);
+
+    const documentProfile = {
+      documentType,
+      ocrEngine,
+      ocrConfidence: quality.confidence,
+      characterCount: quality.characterCount,
+      lineCount: quality.lineCount,
+      medicationSignalCount: quality.medicationSignalCount,
+      likelyPrescription: quality.likelyPrescription,
+      language
+    };
+
+    let parsedResult;
+    try {
+      console.log(`Sending OCR text to ${LLM_MODEL} for contextual parsing...`);
+      const llmResult = await parsePrescriptionWithLlm({
+        rawText,
+        language,
+        documentProfile,
+        candidates: heuristicCandidates
+      });
+      parsedResult = llmResult.parsed;
+      if (llmResult.llmWarning) warnings.push(llmResult.llmWarning);
+    } catch (llmErr) {
+      console.error('LLM parsing failed, using deterministic extraction fallback:', llmErr.message);
+      warnings.push('AI parser failed; deterministic medicine extraction was used.');
+      parsedResult = buildFallbackParsedResult({
+        rawText,
+        language,
+        documentType,
+        warnings
+      });
+    }
+
+    const parsedWarnings = Array.isArray(parsedResult.warnings) ? parsedResult.warnings : [];
+    const aiConfidenceRaw = Number(parsedResult.aiConfidence);
+    const aiConfidence = Number.isFinite(aiConfidenceRaw)
+      ? Number(((aiConfidenceRaw > 1 ? aiConfidenceRaw / 100 : aiConfidenceRaw) * 100).toFixed(1))
+      : heuristicCandidates.length ? 55 : 35;
+
+    parsedResult = {
+      doctorName: parsedResult.doctorName || 'Unknown Doctor',
+      patientName: parsedResult.patientName || '',
+      specialty: parsedResult.specialty || 'General',
+      date: parsedResult.date || new Date().toISOString().split('T')[0],
+      documentType: parsedResult.documentType || documentType,
+      contextSummary: parsedResult.contextSummary || 'Clinical document parsed from OCR text.',
+      ocrEngine,
+      ocrConfidence: quality.confidence,
+      aiConfidence,
+      quality,
+      warnings: uniqueValues([...parsedWarnings, ...(quality.warnings || []), ...warnings]),
+      rawText,
+      extractedMeds: mergeMedicineLists(
+        Array.isArray(parsedResult.extractedMeds) ? parsedResult.extractedMeds : [],
+        heuristicCandidates
+      )
+    };
+
+    if (parsedResult.extractedMeds.length === 0 && !quality.likelyPrescription) {
+      parsedResult.doctorName = parsedResult.doctorName || 'Not a prescription document';
+      parsedResult.warnings = uniqueValues([
+        ...parsedResult.warnings,
+        'No medications were confidently detected.'
+      ]);
+    }
+
+    try {
+      if (isDbConnected) {
+        const log = new PrescriptionLog({
+          userId: req.body.userId || 'anonymous',
+          doctorName: parsedResult.doctorName || 'Unknown',
+          patientName: parsedResult.patientName || '',
+          specialty: parsedResult.specialty || 'General',
+          date: parsedResult.date || new Date().toISOString().split('T')[0],
+          documentType: parsedResult.documentType,
+          ocrEngine: parsedResult.ocrEngine,
+          ocrConfidence: parsedResult.ocrConfidence,
+          aiConfidence: parsedResult.aiConfidence,
+          quality: parsedResult.quality,
+          warnings: parsedResult.warnings,
+          contextSummary: parsedResult.contextSummary,
+          rawText,
+          extractedMeds: parsedResult.extractedMeds
+        });
+        await log.save();
+      } else {
+        localPrescriptionLogs.push({
+          id: 'log_' + Date.now(),
+          ...parsedResult
+        });
+      }
+    } catch (dbErr) {
+      console.error('Failed to save prescription log:', dbErr.message);
+    }
+
+    res.json(parsedResult);
+  } catch (error) {
+    console.error('OCR Pipeline Server Error:', error);
+    res.status(500).json({ error: 'OCR scan failed', message: error.message });
+  }
+});
+
+// Legacy scanner kept as a diagnostic fallback.
+app.post('/api/scan-prescription-legacy', upload.single('image'), async (req, res) => {
   try {
     let rawText = '';
     const sampleId = req.body.sampleId;
@@ -369,7 +1241,7 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.3-70b-instruct',
+        model: LLM_MODEL,
         messages: [
           {
             role: 'system',
@@ -709,7 +1581,7 @@ app.get('/api/medicine-info', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.3-70b-instruct',
+        model: LLM_MODEL,
         messages: [
           {
             role: 'system',
@@ -782,7 +1654,7 @@ app.post('/api/check-interactions', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.3-70b-instruct',
+        model: LLM_MODEL,
         messages: [
           {
             role: 'system',
@@ -889,7 +1761,7 @@ app.post('/api/chat-guide', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.3-70b-instruct',
+        model: LLM_MODEL,
         messages: [
           {
             role: 'system',
