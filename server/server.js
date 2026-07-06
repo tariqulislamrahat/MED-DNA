@@ -359,7 +359,7 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
     // Truncate very long OCR text to avoid LLM token overflow and malformed JSON
     const llmInputText = rawText.length > 3000 ? rawText.substring(0, 3000) + '\n[... text truncated ...]' : rawText;
 
-    console.log('Sending text to NVIDIA Llama-3.1-8b-Instruct...');
+    console.log('Sending text to NVIDIA Llama-3.3-70b-Instruct...');
 
     // 2. Call Llama to parse the OCR text into structured medicine data
     const llmResponse = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -369,7 +369,7 @@ app.post('/api/scan-prescription', upload.single('image'), async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.1-8b-instruct',
+        model: 'meta/llama-3.3-70b-instruct',
         messages: [
           {
             role: 'system',
@@ -707,7 +707,7 @@ app.get('/api/medicine-info', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.1-8b-instruct',
+        model: 'meta/llama-3.3-70b-instruct',
         messages: [
           {
             role: 'system',
@@ -780,7 +780,7 @@ app.post('/api/check-interactions', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.1-8b-instruct',
+        model: 'meta/llama-3.3-70b-instruct',
         messages: [
           {
             role: 'system',
@@ -887,7 +887,7 @@ app.post('/api/chat-guide', async (req, res) => {
         'Authorization': `Bearer ${process.env.NVIDIA_LLM_KEY}`
       },
       body: JSON.stringify({
-        model: 'meta/llama-3.1-8b-instruct',
+        model: 'meta/llama-3.3-70b-instruct',
         messages: [
           {
             role: 'system',
