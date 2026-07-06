@@ -14,6 +14,37 @@ import {
 
 
 
+const compressImage = (dataUrl: string, maxDim: number = 1600): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      } else {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+};
+
 export const Scanner: React.FC = () => {
   const { 
     startScanning, 
@@ -29,7 +60,6 @@ export const Scanner: React.FC = () => {
   } = useMed();
 
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [selectedFileMime, setSelectedFileMime] = useState<string | null>(null);
   const [selectedSampleId, setSelectedSampleId] = useState<string>('');
   
   // Real-time terminal simulator logs
@@ -99,7 +129,6 @@ export const Scanner: React.FC = () => {
     const sample = SAMPLE_PRESCRIPTIONS.find(s => s.id === id);
     if (sample) {
       setSelectedFile(sample.imageUrl);
-      setSelectedFileMime('image/jpeg');
     }
   };
 
@@ -107,10 +136,11 @@ export const Scanner: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         if (event.target?.result) {
-          setSelectedFile(event.target.result as string);
-          setSelectedFileMime(file.type || null);
+          const rawData = event.target.result as string;
+          const compressed = await compressImage(rawData);
+          setSelectedFile(compressed);
           setSelectedSampleId('custom');
         }
       };
@@ -179,10 +209,11 @@ export const Scanner: React.FC = () => {
     const file = e.dataTransfer.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         if (event.target?.result) {
-          setSelectedFile(event.target.result as string);
-          setSelectedFileMime(file.type || null);
+          const rawData = event.target.result as string;
+          const compressed = await compressImage(rawData);
+          setSelectedFile(compressed);
           setSelectedSampleId('custom');
         }
       };
@@ -196,7 +227,6 @@ export const Scanner: React.FC = () => {
     // Map to remove selection status before importing
     saveScannedMeds(medsToImport.map(({ selected, ...rest }) => rest));
     setSelectedFile(null);
-    setSelectedFileMime(null);
     setSelectedSampleId('');
   };
 
@@ -213,7 +243,6 @@ export const Scanner: React.FC = () => {
   const selectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: true })));
   const deselectAllMeds = () => setEditedMeds(prev => prev.map(m => ({ ...m, selected: false })));
 
-  const selectedIsPdf = selectedFileMime === 'application/pdf' || selectedFile?.startsWith('data:application/pdf');
   const sampleDoc = SAMPLE_PRESCRIPTIONS.find(s => s.id === selectedSampleId) || SAMPLE_PRESCRIPTIONS[0];
   const handwritingLines = sampleDoc.rawHandwriting.split('\n');
 
