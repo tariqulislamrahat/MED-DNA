@@ -11,7 +11,7 @@ interface Message {
 }
 
 export const AiGuide: React.FC = () => {
-  const { language, t } = useMed();
+  const { language, t, user } = useMed();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -143,23 +143,37 @@ export const AiGuide: React.FC = () => {
 
           <div className="chat-messages-area">
             {messages.map((msg, idx) => (
-              <div key={idx} className={`chat-message-bubble ${msg.role === 'user' ? 'msg-user' : 'msg-ai'} ${msg.isDeclined ? 'msg-declined' : ''}`}>
-                <div className="message-avatar">
-                  {msg.role === 'user' ? 'U' : 'AI'}
-                </div>
-                <div className="message-content-wrapper">
-                  <p className="message-text">{msg.content}</p>
-                  {msg.isDeclined && (
-                    <span className="decline-warning-badge">
-                      <AlertCircle size={10} /> {t('nonMedicalRestricted')}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="chat-message-bubble msg-ai msg-loading">
-                <div className="message-avatar">AI</div>
+               <div key={idx} className={`chat-message-bubble ${msg.role === 'user' ? 'msg-user' : 'msg-ai'} ${msg.isDeclined ? 'msg-declined' : ''}`}>
+                 {msg.role === 'user' ? (
+                   user && user.avatar ? (
+                     <img src={user.avatar} className="message-avatar message-avatar-img" alt="User" />
+                   ) : (
+                     <div className="message-avatar">
+                       {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                     </div>
+                   )
+                 ) : (
+                   <div className="message-avatar msg-ai-avatar">
+                     <span className="logo-d-flipped">D</span>
+                     <span className="logo-d">D</span>
+                   </div>
+                 )}
+                 <div className="message-content-wrapper">
+                   <p className="message-text">{msg.content}</p>
+                   {msg.isDeclined && (
+                     <span className="decline-warning-badge">
+                       <AlertCircle size={10} /> {t('nonMedicalRestricted')}
+                     </span>
+                   )}
+                 </div>
+               </div>
+             ))}
+             {loading && (
+               <div className="chat-message-bubble msg-ai msg-loading">
+                 <div className="message-avatar msg-ai-avatar">
+                   <span className="logo-d-flipped">D</span>
+                   <span className="logo-d">D</span>
+                 </div>
                 <div className="loading-bubbles">
                   <span></span>
                   <span></span>
@@ -329,6 +343,37 @@ export const AiGuide: React.FC = () => {
           font-size: 0.75rem;
           font-weight: bold;
           flex-shrink: 0;
+        }
+
+        .message-avatar-img {
+          object-fit: cover;
+          border: 1px solid var(--border-color);
+        }
+
+        .msg-ai-avatar {
+          background: var(--color-danger) !important;
+          display: inline-flex !important;
+          align-items: center;
+          justify-content: center;
+          gap: 1px;
+          box-shadow: 0 2px 6px rgba(239, 68, 68, 0.2);
+        }
+
+        .logo-d-flipped {
+          display: inline-block;
+          transform: scaleX(-1);
+          color: white;
+          font-weight: 900;
+          font-family: var(--font-sans);
+          font-size: 0.75rem;
+        }
+
+        .logo-d {
+          display: inline-block;
+          color: white;
+          font-weight: 900;
+          font-family: var(--font-sans);
+          font-size: 0.75rem;
         }
 
         .msg-ai .message-avatar {
