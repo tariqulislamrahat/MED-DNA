@@ -4,8 +4,23 @@ import type { ExtractedMedicine, Pharmacy, MedicineInfo } from './mockData';
 export interface ScanResult {
   rawText: string;
   doctorName: string;
+  patientName?: string;
   specialty: string;
   date: string;
+  documentType?: string;
+  contextSummary?: string;
+  ocrEngine?: string;
+  ocrConfidence?: number;
+  aiConfidence?: number;
+  quality?: {
+    characterCount?: number;
+    lineCount?: number;
+    medicationSignalCount?: number;
+    confidence?: number;
+    likelyPrescription?: boolean;
+    warnings?: string[];
+  };
+  warnings?: string[];
   extractedMeds: Omit<ExtractedMedicine, 'id' | 'startDate'>[];
 }
 
@@ -16,11 +31,15 @@ export const mockApi = {
    * Sends the prescription image (base64) or sample id to the backend Express server
    */
   scanPrescription: async (input: string, userId: string = 'anonymous', language: string = 'en'): Promise<ScanResult> => {
-    let payload: { image?: string; sampleId?: string; userId: string; language: string } = { userId, language };
+    let payload: { image?: string; document?: string; sampleId?: string; userId: string; language: string } = { userId, language };
     
-    // Check if input is a base64 data URL (real uploaded image)
-    if (input.startsWith('data:image/')) {
-      payload.image = input;
+    // Check if input is a base64 data URL (real uploaded image/PDF)
+    if (input.startsWith('data:')) {
+      if (input.startsWith('data:image/')) {
+        payload.image = input;
+      } else {
+        payload.document = input;
+      }
     } else {
       // It's a sample ID — the backend handles sample text injection directly
       payload.sampleId = input;
@@ -45,14 +64,22 @@ export const mockApi = {
       return {
         rawText: result.rawText || '',
         doctorName: result.doctorName || 'Unknown Doctor',
+        patientName: result.patientName || '',
         specialty: result.specialty || 'General Practice',
         date: result.date || new Date().toISOString().split('T')[0],
+        documentType: result.documentType,
+        contextSummary: result.contextSummary,
+        ocrEngine: result.ocrEngine,
+        ocrConfidence: result.ocrConfidence,
+        aiConfidence: result.aiConfidence,
+        quality: result.quality,
+        warnings: result.warnings || [],
         extractedMeds: result.extractedMeds || []
       };
     } catch (error: any) {
       console.warn('API connection failed:', error);
-      // If we uploaded a real image and it failed, throw so the UI shows the error
-      if (input.startsWith('data:image/')) {
+      // If we uploaded a real document and it failed, throw so the UI shows the error
+      if (input.startsWith('data:')) {
         throw new Error(error.message || 'Failed to scan prescription. Make sure the backend server is running.');
       }
       // For sample IDs, fall back to local data if server is unreachable
@@ -62,6 +89,11 @@ export const mockApi = {
         doctorName: sample.doctorName,
         specialty: sample.specialty,
         date: sample.date,
+        documentType: 'sample prescription',
+        ocrEngine: 'local sample',
+        ocrConfidence: 99,
+        aiConfidence: 90,
+        warnings: [],
         extractedMeds: sample.parsedMeds
       };
     }
