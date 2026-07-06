@@ -27,7 +27,7 @@ const JSON_BODY_LIMIT = process.env.JSON_BODY_LIMIT || '30mb';
 const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB || 25);
 const OCR_TIMEOUT_MS = Number(process.env.OCR_TIMEOUT_MS || 45000);
 const LLM_TIMEOUT_MS = Number(process.env.LLM_TIMEOUT_MS || 60000);
-const LLM_MODEL = process.env.NVIDIA_LLM_MODEL || 'meta/llama-3.3-70b-instruct';
+const LLM_MODEL = process.env.NVIDIA_LLM_MODEL || 'meta/llama-3.1-8b-instruct';
 const ALLOWED_TIMINGS = ['morning', 'afternoon', 'evening', 'night'];
 
 app.use(compression());
