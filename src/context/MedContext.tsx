@@ -207,10 +207,10 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const email = user.email;
           const [medsRes, adherenceRes, prescriptionsRes, emailLogsRes] = await Promise.all([
-            fetch(`/api/medicines?userId=${email}`),
-            fetch(`/api/adherence?userId=${email}`),
-            fetch(`/api/prescriptions?userId=${email}`),
-            fetch(`/api/email-logs?userId=${email}`)
+            fetch(`${API_BASE}/api/medicines?userId=${email}`),
+            fetch(`${API_BASE}/api/adherence?userId=${email}`),
+            fetch(`${API_BASE}/api/prescriptions?userId=${email}`),
+            fetch(`${API_BASE}/api/email-logs?userId=${email}`)
           ]);
           
           if (medsRes.ok && adherenceRes.ok) {

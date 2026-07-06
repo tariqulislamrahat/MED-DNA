@@ -10,6 +10,23 @@ interface Message {
   isDeclined?: boolean;
 }
 
+const fetchWithRetry = async (url: string, options: RequestInit, retries: number = 3, delay: number = 1000): Promise<Response> => {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok && res.status >= 500 && retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+    }
+    return res;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchWithRetry(url, options, retries - 1, delay * 1.5);
+    }
+    throw err;
+  }
+};
+
 export const AiGuide: React.FC = () => {
   const { language, t, user } = useMed();
   
@@ -60,7 +77,7 @@ export const AiGuide: React.FC = () => {
         content: m.content
       }));
 
-      const res = await fetch(`${API_BASE}/api/chat-guide`, {
+      const res = await fetchWithRetry(`${API_BASE}/api/chat-guide`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
