@@ -575,6 +575,15 @@ export const AiGuide: React.FC = () => {
           gap: 0.4rem;
           margin: 0.5rem 0 0 0;
         }
+
+        @media (max-width: 900px) {
+          .chat-layout-container {
+            grid-template-columns: 1fr;
+          }
+          .chat-sidebar-panel {
+            display: none;
+          }
+        }
       `}</style>
     </div>
   );
