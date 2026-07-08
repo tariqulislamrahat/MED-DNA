@@ -19,11 +19,11 @@ export const Tracker: React.FC = () => {
   const todayStr = new Date().toISOString().split('T')[0];
   const selectedDateStr = selectedDate.toISOString().split('T')[0];
 
-  // Helper to generate last 7 days starting from 4 days ago to 2 days ahead
+  // Helper to generate 7 days centered around selectedDate
   const getWeekDays = () => {
     const days = [];
-    const start = new Date();
-    start.setDate(start.getDate() - 4); // start 4 days ago
+    const start = new Date(selectedDate);
+    start.setDate(selectedDate.getDate() - 3); // 3 days before selectedDate
     
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);

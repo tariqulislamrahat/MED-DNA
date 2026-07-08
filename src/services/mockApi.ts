@@ -77,25 +77,8 @@ export const mockApi = {
         extractedMeds: result.extractedMeds || []
       };
     } catch (error: any) {
-      console.warn('API connection failed:', error);
-      // If we uploaded a real document and it failed, throw so the UI shows the error
-      if (input.startsWith('data:')) {
-        throw new Error(error.message || 'Failed to scan prescription. Make sure the backend server is running.');
-      }
-      // For sample IDs, fall back to local data if server is unreachable
-      const sample = SAMPLE_PRESCRIPTIONS.find(s => s.id === input) || SAMPLE_PRESCRIPTIONS[0];
-      return {
-        rawText: sample.rawHandwriting,
-        doctorName: sample.doctorName,
-        specialty: sample.specialty,
-        date: sample.date,
-        documentType: 'sample prescription',
-        ocrEngine: 'local sample',
-        ocrConfidence: 99,
-        aiConfidence: 90,
-        warnings: [],
-        extractedMeds: sample.parsedMeds
-      };
+      console.error('OCR API request failed:', error);
+      throw new Error(error.message || 'Failed to scan prescription. Make sure the backend server is running.');
     }
   },
 

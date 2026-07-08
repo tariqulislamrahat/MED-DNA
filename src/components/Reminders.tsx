@@ -480,8 +480,9 @@ export const Reminders: React.FC = () => {
         .time-picker {
           padding: 0.25rem 0.5rem;
           font-size: 0.85rem;
-          background: #090d16;
+          background: var(--bg-input);
           border-color: var(--border-color);
+          color: var(--text-primary);
         }
 
         .testing-actions {

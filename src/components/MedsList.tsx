@@ -13,10 +13,15 @@ import {
   Clock, 
   Info,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Plus
 } from 'lucide-react';
 
-export const MedsList: React.FC = () => {
+interface MedsListProps {
+  onOpenAddModal?: () => void;
+}
+
+export const MedsList: React.FC<MedsListProps> = ({ onOpenAddModal }) => {
   const { medicines, removeMedicine, speakText, stopSpeech, activeSpeechId, interactionWarnings, requestRefill, language, t } = useMed();
   const [selectedMedInfo, setSelectedMedInfo] = useState<MedicineInfo | null>(null);
   const [loadingSafetyInfo, setLoadingSafetyInfo] = useState(false);
@@ -63,8 +68,16 @@ export const MedsList: React.FC = () => {
   return (
     <div className="meds-list-view animate-fade-in">
       <header className="view-header">
-        <h1>{t('myActiveMeds')}</h1>
-        <p>{t('myActiveMedsSub')}</p>
+        <div>
+          <h1>{t('myActiveMeds')}</h1>
+          <p>{t('myActiveMedsSub')}</p>
+        </div>
+        {onOpenAddModal && (
+          <button className="view-header-add-btn" onClick={onOpenAddModal} title={t('addMed')}>
+            <Plus size={16} strokeWidth={2.5} />
+            <span>{t('addMed')}</span>
+          </button>
+        )}
       </header>
 
       {/* Interaction Warning Panel */}
@@ -340,6 +353,50 @@ export const MedsList: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
+        }
+
+        .view-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .view-header-add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          background: var(--color-primary);
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: var(--radius-full);
+          font-family: var(--font-sans);
+          font-weight: 700;
+          font-size: 0.8rem;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          box-shadow: 0 2px 8px rgba(229, 57, 53, 0.2);
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+
+        .view-header-add-btn:hover {
+          background: #d32f2f;
+          transform: translateY(-1px);
+        }
+
+        @media (max-width: 480px) {
+          .view-header-add-btn span {
+            display: none;
+          }
+          .view-header-add-btn {
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            justify-content: center;
+          }
         }
 
         /* Interactions banner */
