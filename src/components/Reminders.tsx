@@ -9,8 +9,11 @@ import {
   Play
 } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 export const Reminders: React.FC = () => {
   const { 
+    user,
     notificationsEnabled, 
     setNotificationsEnabled,
     emailNotificationsEnabled, 
@@ -82,12 +85,35 @@ export const Reminders: React.FC = () => {
     updateSlotTime(slot, val);
   };
 
-  const testEmailNotification = () => {
-    // Simulated Email Notification
-    sendPushTest(
-      "MedDNA Email Simulation",
-      `Mock email dispatched to alex.mercer@gmail.com: Daily medicine compliance reports are ready.`
-    );
+  const testEmailNotification = async () => {
+    const email = user?.email || 'alex.mercer@gmail.com';
+    try {
+      const response = await fetch(`${API_BASE}/api/send-email-reminder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: email,
+          recipient: email,
+          subject: "MedDNA Daily Compliance Report",
+          body: `Hello, this is your daily medicine compliance report. All scheduled medicines have been logged successfully.`
+        })
+      });
+      if (response.ok) {
+        fetchEmailLogs();
+        sendPushTest(
+          "MedDNA Email Simulation",
+          `Mock email successfully sent to ${email} and recorded in logs.`
+        );
+      } else {
+        throw new Error('Server responded with an error');
+      }
+    } catch (e: any) {
+      console.warn("Failed to simulate email notification:", e);
+      sendPushTest(
+        "Simulation Error",
+        "Failed to send simulated email reminder. Make sure the backend server is running."
+      );
+    }
   };
 
   return (

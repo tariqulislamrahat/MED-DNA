@@ -742,14 +742,31 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Browser Push Notifications API simulation
   const sendPushTest = (title: string, body: string) => {
-    if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, {
-        body,
-        icon: 'https://cdn-icons-png.flaticon.com/512/822/822143.png'
-      });
-    } else {
-      console.log(`[PUSH NOTIFICATION MOCK] Title: ${title} | Body: ${body}`);
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification(title, {
+          body,
+          icon: 'https://cdn-icons-png.flaticon.com/512/822/822143.png'
+        });
+        return;
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification(title, {
+              body,
+              icon: 'https://cdn-icons-png.flaticon.com/512/822/822143.png'
+            });
+            return;
+          } else {
+            alert(`${title}\n\n${body}`);
+          }
+        });
+        return;
+      }
     }
+    
+    // In-app alert fallback if push notifications are blocked/unsupported
+    alert(`${title}\n\n${body}`);
   };
 
   // Real-Time Background Notification Scheduler
