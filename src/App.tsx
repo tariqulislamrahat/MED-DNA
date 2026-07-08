@@ -16,8 +16,10 @@ import {
   BarChart3, 
   User,
   X,
-  Plus
+  Plus,
+  Sparkles
 } from 'lucide-react';
+
 
 function App() {
   const { user, sosTriggered, addMedicine } = useMed();
@@ -52,7 +54,7 @@ function App() {
       case 'tracker':
         return <Tracker />;
       case 'meds':
-        return <MedsList />;
+        return <MedsList onOpenAddModal={() => setIsAddModalOpen(true)} />;
       case 'pharmacy':
         return <Pharmacy />;
       case 'analytics':
@@ -104,6 +106,7 @@ function App() {
   const mobileTabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'scanner', label: 'Scan', icon: ScanLine },
+    { id: 'aiguide', label: 'AI', icon: Sparkles },
     { id: 'analytics', label: 'Stats', icon: BarChart3 },
     { id: 'reminders', label: 'Profile', icon: User }
   ];
@@ -142,14 +145,6 @@ function App() {
               </button>
             );
           })}
-
-          {/* FAB Add button like the reference */}
-          <button 
-            className="mobile-fab-btn"
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <Plus size={22} strokeWidth={2.5} />
-          </button>
         </div>
       </nav>
 
@@ -297,29 +292,6 @@ function App() {
           color: white;
         }
 
-        .mobile-fab-btn {
-          width: 46px;
-          height: 46px;
-          border-radius: 50%;
-          background: var(--color-primary);
-          color: white;
-          border: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 4px 12px rgba(229, 57, 53, 0.35);
-          transition: all var(--transition-fast);
-          flex-shrink: 0;
-        }
-
-        .mobile-fab-btn:hover {
-          transform: scale(1.05);
-        }
-
-        .mobile-fab-btn:active {
-          transform: scale(0.95);
-        }
 
         @media (max-width: 768px) {
           .mobile-bottom-nav {

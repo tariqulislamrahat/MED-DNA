@@ -387,11 +387,15 @@ export const MedProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const startScanning = async (sampleId?: string) => {
+    if (!sampleId) {
+      setScanError("No prescription document selected.");
+      return;
+    }
     setIsScanning(true);
     setScanResult(null);
     setScanError(null);
     try {
-      const result = await mockApi.scanPrescription(sampleId || 'pres_01', user?.email || 'anonymous', language);
+      const result = await mockApi.scanPrescription(sampleId, user?.email || 'anonymous', language);
       setScanResult(result);
     } catch (e: any) {
       console.error("Scanning failed", e);

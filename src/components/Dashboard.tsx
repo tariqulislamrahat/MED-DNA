@@ -96,6 +96,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
           <h1 className="dash-user-name">{user?.name || 'User'}</h1>
         </div>
         <div className="dash-header-right">
+          <button className="dash-add-btn" onClick={onOpenAddModal} title={t('addMed')}>
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
           <img src={user?.avatar} alt={user?.name} className="dash-avatar" />
           <button className="dash-bell-btn" onClick={() => setCurrentTab('reminders')}>
             <Bell size={18} />
@@ -457,6 +460,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ setCurrentTab, onOpenAddMo
           display: flex;
           align-items: center;
           gap: 0.6rem;
+        }
+
+        .dash-add-btn {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: var(--color-primary);
+          color: white;
+          border: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          box-shadow: 0 2px 8px rgba(229, 57, 53, 0.2);
+        }
+
+        .dash-add-btn:hover {
+          background: #d32f2f;
+          transform: scale(1.05);
         }
 
         .dash-avatar {
